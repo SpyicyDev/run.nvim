@@ -1,6 +1,6 @@
 local config = {}
 
-local defaults = require("run.defaults")
+local defaults = {}
 
 function config.setup(opts)
     config.opts = {}
