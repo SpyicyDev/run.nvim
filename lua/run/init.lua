@@ -76,6 +76,12 @@ M.run_file = function()
     local buf = vim.api.nvim_buf_get_name(0)
     local ftype = vim.filetype.match({ filename = buf })
     local exec = config.opts.filetype[ftype]
+    if exec == nil then
+        require("notify")("No default script found for filetype " .. ftype .. "!", "error", {
+            title = "run.nvim"
+        })
+        return
+    end
     if type(exec) == "function" then
         exec = exec()
     end
