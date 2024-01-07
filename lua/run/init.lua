@@ -8,8 +8,26 @@ M.setup = function(opts)
 
     M.setup_proj()
     vim.api.nvim_create_autocmd({ "DirChanged" }, {
+        desc = "Setup run.toml on DirChanged",
         callback = function()
             M.setup_proj()
+        end
+    })
+
+    vim.api.nvim_create_autocmd("BufReadPre", {
+        desc = "Setup run keymap and user command",
+        callback = function()
+            vim.keymap.set("n", "<leader>rr", function() M.run() end, { buffer = true, noremap = true, silent = false })
+
+            vim.api.nvim_buf_create_user_command(0, "Run", function(args)
+                if args.fargs[1] == nil then
+                    M.run()
+                else
+                    require("notify")("Run takes no arguments", "error", {
+                        title = "run.nvim"
+                    })
+                end
+            end, { desc = "Run a Script" })
         end
     })
 end
@@ -24,6 +42,16 @@ M.setup_proj = function()
         end
 
         config.proj_file_exists = true
+
+        vim.api.nvim_create_user_command("RunSetDefault", function(args)
+            if args[0] == nil then
+                M.set_default()
+            else
+                require("notify")("RunSetDefault takes no arguments", "error", {
+                    title = "run.nvim"
+                })
+            end
+        end, { desc = "Set a Default Script" })
     else
         config.proj_file_exists = false
     end
