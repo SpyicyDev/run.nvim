@@ -3,6 +3,7 @@ local config = {}
 local defaults = {
     keys = {
         run = "<leader>rr",
+        run_proj = "<leader>rp",
     }
 }
 

@@ -23,6 +23,11 @@ M.setup = function(opts)
       vim.api.nvim_buf_create_user_command(0, "Run", function()
         M.run()
       end, { desc = "Run a Script" })
+
+      if config.proj_file_exists then
+        vim.keymap.set("n", config.opts.keys["run_proj"], function() M.run_proj() end,
+          { buffer = true, noremap = true, silent = false })
+      end
     end
   })
 end
@@ -57,7 +62,11 @@ M.run = function()
   if not config.proj_file_exists then
     M.run_file()
   else
-    M.run_proj()
+    if config.proj.settings and config.proj.settings["default"] ~= nil then
+      M.run_proj_default()
+    else
+      M.run_proj()
+    end
   end
 end
 
@@ -81,35 +90,35 @@ M.run_file = function()
 end
 
 M.run_proj = function()
-  if config.proj.settings and config.proj.settings["default"] ~= nil then
-    local exec = config.proj[config.proj.settings["default"]].cmd
+  local options = {}
+  for _, entry in pairs(config.proj) do
+    table.insert(options, entry.name)
+  end
+  table.insert(options, "Default for Filetype")
+  vim.ui.select(options, {
+    prompt = "Choose a script...",
+  }, function(choice)
+    if choice == "Default for Filetype" then
+      M.run_file()
+      return
+    end
+
+    local exec = ""
+    for _, entry in pairs(config.proj) do
+      if entry.name == choice then
+        exec = entry.cmd
+        break
+      end
+    end
     exec = utils.fmt_cmd(exec)
     term.scratch({ cmd = exec })
-  else
-    local options = {}
-    for _, entry in pairs(config.proj) do
-      table.insert(options, entry.name)
-    end
-    table.insert(options, "Default for Filetype")
-    vim.ui.select(options, {
-      prompt = "Choose a script...",
-    }, function(choice)
-      if choice == "Default for Filetype" then
-        M.run_file()
-        return
-      end
+  end)
+end
 
-      local exec = ""
-      for _, entry in pairs(config.proj) do
-        if entry.name == choice then
-          exec = entry.cmd
-          break
-        end
-      end
-      exec = utils.fmt_cmd(exec)
-      term.scratch({ cmd = exec })
-    end)
-  end
+M.run_proj_default = function()
+  local exec = config.proj[config.proj.settings["default"]].cmd
+  exec = utils.fmt_cmd(exec)
+  term.scratch({ cmd = exec })
 end
 
 M.set_default = function()
