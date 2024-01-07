@@ -34,6 +34,8 @@ function M.read_toml(proj_file)
     return parsed_toml
 end
 
+---Writes TOML to run.toml
+---@param toml_content table
 function M.write_toml(toml_content)
     local toml = require("toml")
     local proj_file = vim.fn.findfile("run.toml", ".;")
@@ -46,6 +48,9 @@ function M.write_toml(toml_content)
     file:close()
 end
 
+---Formats a TOML string
+---@param toml_string string
+---@return string
 function M.fmt_toml(toml_string)
     -- Move the settings block to the top
     local settings_block = toml_string:match("%[settings%][^%[]*")
