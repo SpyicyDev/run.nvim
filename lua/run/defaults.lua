@@ -1,12 +1,13 @@
 local defaults = {
     filetype = {
-        python = [[
-        if [ -f $dir/../pyproject.toml ] || [ -f $dir/pyproject.toml ]; then
-            poetry run python3 %f
-        else
-            python3 %f
-        fi
-        ]],
+        python = function()
+            if vim.fn.findfile("pyproject.toml", ".;") ~= "" then
+                return "poetry run python3 %f"
+            else
+                return "python3 %f"
+            end
+        end,
+        lua = "lua %f",
     }
 }
 

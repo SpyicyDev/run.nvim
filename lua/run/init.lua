@@ -6,8 +6,6 @@ local config = require("run.config")
 M.setup = function(opts)
     config.setup(opts)
 
-    config.proj_file_exists = false
-
     M.setup_proj()
     vim.api.nvim_create_autocmd({ "DirChanged" }, {
         callback = function()
@@ -26,6 +24,8 @@ M.setup_proj = function()
         end
 
         config.proj_file_exists = true
+    else
+        config.proj_file_exists = false
     end
 end
 
@@ -48,6 +48,9 @@ M.run_file = function()
     local buf = vim.api.nvim_buf_get_name(0)
     local ftype = vim.filetype.match({ filename = buf })
     local exec = config.opts.filetype[ftype]
+    if type(exec) == "function" then
+        exec = exec()
+    end
     exec = utils.fmt_cmd(exec)
     if exec ~= nil then
         term.scratch({ cmd = exec })
@@ -55,7 +58,7 @@ M.run_file = function()
 end
 
 M.run_proj = function()
-    if config.proj.settings["default"] ~= nil then
+    if config.proj.settings and config.proj.settings["default"] ~= nil then
         local exec = config.proj[config.proj.settings["default"]].cmd
         exec = utils.fmt_cmd(exec)
         term.scratch({ cmd = exec })
@@ -64,9 +67,15 @@ M.run_proj = function()
         for _, entry in pairs(config.proj) do
             table.insert(options, entry.name)
         end
+        table.insert(options, "Default for Filetype")
         vim.ui.select(options, {
             prompt = "Choose a script...",
         }, function(choice)
+            if choice == "Default for Filetype" then
+                M.run_file()
+                return
+            end
+
             local exec = ""
             for _, entry in pairs(config.proj) do
                 if entry.name == choice then
@@ -86,17 +95,33 @@ M.set_default = function()
         for _, entry in pairs(config.proj) do
             table.insert(options, entry.name)
         end
+        if config.proj.settings ~= nil and config.proj.settings["default"] ~= nil then
+            table.insert(options, "Clear Default")
+        end
+
         vim.ui.select(options, {
             prompt = "Choose a default script..."
         }, function(choice)
+            if choice == "Clear Default" then
+                config.proj.settings = nil
+                utils.write_toml(config.proj)
+                M.reload_proj()
+                require("notify")("Default script cleared", "info", {
+                    title = "run.nvim"
+                })
+                return
+            end
+
             for title, entry in pairs(config.proj) do
                 if entry.name == choice then
-                    config.proj.settings = vim.tbl_deep_extend("keep", config.proj.settings or {}, { default = title })
+                    config.proj.settings = vim.tbl_deep_extend("force", config.proj.settings or {}, { default = title })
                     break
                 end
             end
 
             utils.write_toml(config.proj)
+
+            M.reload_proj()
 
             require("notify")("Default script set to " .. choice, "info", {
                 title = "run.nvim"
