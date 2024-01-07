@@ -17,16 +17,11 @@ M.setup = function(opts)
     vim.api.nvim_create_autocmd("BufReadPre", {
         desc = "Setup run keymap and user command",
         callback = function()
-            vim.keymap.set("n", config.opts.keys["run"], function() M.run() end, { buffer = true, noremap = true, silent = false })
+            vim.keymap.set("n", config.opts.keys["run"], function() M.run() end,
+                { buffer = true, noremap = true, silent = false })
 
-            vim.api.nvim_buf_create_user_command(0, "Run", function(args)
-                if args.fargs[1] == nil then
-                    M.run()
-                else
-                    require("notify")("Run takes no arguments", "error", {
-                        title = "run.nvim"
-                    })
-                end
+            vim.api.nvim_buf_create_user_command(0, "Run", function()
+                M.run()
             end, { desc = "Run a Script" })
         end
     })
@@ -43,14 +38,8 @@ M.setup_proj = function()
 
         config.proj_file_exists = true
 
-        vim.api.nvim_create_user_command("RunSetDefault", function(args)
-            if args[0] == nil then
-                M.set_default()
-            else
-                require("notify")("RunSetDefault takes no arguments", "error", {
-                    title = "run.nvim"
-                })
-            end
+        vim.api.nvim_create_user_command("RunSetDefault", function()
+            M.set_default()
         end, { desc = "Set a Default Script" })
     else
         config.proj_file_exists = false
