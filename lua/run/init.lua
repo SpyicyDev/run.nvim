@@ -17,7 +17,7 @@ M.setup = function(opts)
     vim.api.nvim_create_autocmd("BufReadPre", {
         desc = "Setup run keymap and user command",
         callback = function()
-            vim.keymap.set("n", "<leader>rr", function() M.run() end, { buffer = true, noremap = true, silent = false })
+            vim.keymap.set("n", config.opts.keys["run"], function() M.run() end, { buffer = true, noremap = true, silent = false })
 
             vim.api.nvim_buf_create_user_command(0, "Run", function(args)
                 if args.fargs[1] == nil then
