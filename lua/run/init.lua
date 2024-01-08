@@ -84,6 +84,11 @@ M.run_file = function()
     exec = exec()
   end
   exec = utils.fmt_cmd(exec)
+  -- if exec starts with :
+  if exec:sub(1, 1) == ":" then
+    vim.cmd(exec:sub(2))
+    return
+  end
   if exec ~= nil then
     term.scratch({ cmd = exec })
   end
@@ -111,6 +116,10 @@ M.run_proj = function()
       end
     end
     exec = utils.fmt_cmd(exec)
+    if exec:sub(1, 1) == ":" then
+      vim.cmd(exec:sub(2))
+      return
+    end
     term.scratch({ cmd = exec })
   end)
 end
