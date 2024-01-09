@@ -43,7 +43,7 @@ M.run_cmd = function(cmd)
 end
 
 function M.write_conf()
-    local proj_file = vim.fn.findfile("run.lua", ".;")
+    local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     local file = io.open(proj_file, "w")
 
     local conf_string = require("inspect").inspect(config.proj)

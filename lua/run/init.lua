@@ -8,7 +8,7 @@ M.setup = function(opts)
 
     M.setup_proj()
     vim.api.nvim_create_autocmd({ "DirChanged" }, {
-        desc = "Setup run.lua on DirChanged",
+        desc = "Setup run.nvim.lua on DirChanged",
         callback = function()
             M.setup_proj()
         end
@@ -33,7 +33,7 @@ M.setup = function(opts)
 end
 
 M.setup_proj = function()
-    local proj_file = vim.fn.findfile("run.lua", ".;")
+    local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     if proj_file ~= "" then
         config.proj = dofile(proj_file)
 
@@ -181,7 +181,7 @@ M.set_default = function()
             })
         end)
     else
-        vim.notify("No run.lua file found!", vim.log.levels.ERROR, {
+        vim.notify("No run.nvim.lua file found!", vim.log.levels.ERROR, {
             title = "run.nvim"
         })
     end
