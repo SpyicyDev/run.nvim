@@ -1,5 +1,7 @@
 local M = {}
 
+local config = require("run.config")
+
 M.deep_copy = function(obj, seen)
     -- Handle non-tables and previously-seen tables.
     if type(obj) ~= 'table' then return obj end
@@ -21,51 +23,34 @@ M.fmt_cmd = function(cmd)
     return cmd
 end
 
-function M.read_toml(proj_file)
-    local toml = require("toml")
-
-    local file = io.open(proj_file, "r")
-    local toml_content = file:read("*a")
-    file:close()
-
-    -- Parse the TOML content
-    local parsed_toml = toml.parse(toml_content)
-
-    return parsed_toml
-end
-
----Writes TOML to run.toml
----@param toml_content table
-function M.write_toml(toml_content)
-    local toml = require("toml")
-    local proj_file = vim.fn.findfile("run.toml", ".;")
-    local file = io.open(proj_file, "w")
-
-    local toml_string = toml.encode(toml_content)
-    local formatted_toml = M.fmt_toml(toml_string)
-
-    file:write(formatted_toml)
-    file:close()
-end
-
----Formats a TOML string
----@param toml_string string
----@return string
-function M.fmt_toml(toml_string)
-    -- Move the settings block to the top
-    local settings_block = toml_string:match("%[settings%][^%[]*")
-    if settings_block then
-        toml_string = toml_string:gsub("%[settings%][^%[]*", "")
-        -- put newline at end if not there
-        if not settings_block:match("\n$") then
-            settings_block = settings_block .. "\n"
-        end
-        toml_string = settings_block .. toml_string
+M.run_cmd = function(cmd)
+    if type(cmd) == "function" then
+      cmd = cmd()
+      if cmd == nil then
+          return
+      end
     end
 
-    toml_string = toml_string:gsub("\n%[", "\n\n[")
+    cmd = M.fmt_cmd(cmd)
 
-    return toml_string
+    if cmd:sub(1, 1) == ":" then
+        vim.cmd(cmd:sub(2))
+        return
+    end
+
+    local term = require("FTerm")
+    term.scratch({ cmd = cmd })
+end
+
+function M.write_conf()
+    local proj_file = vim.fn.findfile("run.lua", ".;")
+    local file = io.open(proj_file, "w")
+
+    local conf_string = require("inspect").inspect(config.proj)
+    conf_string = "return " .. conf_string
+
+    file:write(conf_string)
+    file:close()
 end
 
 return M
