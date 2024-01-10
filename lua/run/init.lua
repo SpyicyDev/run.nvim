@@ -4,9 +4,15 @@ local utils = require("run.utils")
 local config = require("run.config")
 
 M.setup = function(opts)
+    
+    -- initialize all config variables and stuff
     config.setup(opts)
 
     M.setup_proj()
+
+    --- KEYBINDS AND AUTOCOMMANDS AND USER COMMANDS ---
+
+    -- run setup_proj on DirChanged
     vim.api.nvim_create_autocmd({ "DirChanged" }, {
         desc = "Setup run.nvim.lua on DirChanged",
         callback = function()
@@ -14,16 +20,34 @@ M.setup = function(opts)
         end
     })
 
+    -- global stuff if proj file exists
+    if config.proj_file_exists then
+
+        -- set default command
+        vim.api.nvim_create_user_command("RunSetDefault", function()
+            M.set_default()
+        end, { desc = "Set a Default Script" })
+
+        -- reload proj command
+        vim.api.nvim_create_user_command("RunReloadProj", function()
+            M.reload_proj()
+        end, { desc = "Reload run.nvim.lua" })
+    end
+
+    -- keymaps and user commands that should only be on in an active buffer
     vim.api.nvim_create_autocmd("BufReadPre", {
         desc = "Setup run keymap and user command",
         callback = function()
+            -- main run keybind
             vim.keymap.set("n", config.opts.keys["run"], function() M.run() end,
                 { buffer = true, noremap = true, silent = false })
 
+            -- main run command
             vim.api.nvim_buf_create_user_command(0, "Run", function()
                 M.run()
             end, { desc = "Run a Script" })
 
+            -- proj menu keybind
             if config.proj_file_exists then
                 vim.keymap.set("n", config.opts.keys["run_proj"], function() M.run_proj() end,
                     { buffer = true, noremap = true, silent = false })
@@ -32,28 +56,29 @@ M.setup = function(opts)
     })
 end
 
+-- look for run.nvim.lua, if there load it into config.proj
 M.setup_proj = function()
     local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     if proj_file ~= "" then
         config.proj = dofile(proj_file)
 
         config.proj_file_exists = true
-
-        vim.api.nvim_create_user_command("RunSetDefault", function()
-            M.set_default()
-        end, { desc = "Set a Default Script" })
     else
         config.proj_file_exists = false
     end
 end
 
+-- reload proj file
 M.reload_proj = function()
     config.proj = {}
     M.setup_proj()
+
+    vim.notify("run.nvim.lua reloaded!", vim.log.levels.INFO, {
+        title = "run.nvim"
+    })
 end
 
-local term = require("FTerm")
-
+-- main run method, delegates to either run_file, run_proj, or run_proj_default
 M.run = function()
     if not config.proj_file_exists then
         M.run_file()
@@ -65,6 +90,8 @@ M.run = function()
         end
     end
 end
+
+-- run the default script for the filetype
 M.run_file = function()
     local buf = vim.api.nvim_buf_get_name(0)
     local ftype = vim.filetype.match({ filename = buf })
@@ -81,6 +108,7 @@ M.run_file = function()
     end
 end
 
+-- run a script from the proj table
 M.run_proj = function()
     local options = {}
     for _, entry in pairs(config.proj) do
@@ -137,11 +165,13 @@ M.run_proj = function()
     end)
 end
 
+-- run the default script from the proj file
 M.run_proj_default = function()
     local exec = config.proj[config.proj.default].cmd
     utils.run_cmd(exec)
 end
 
+-- brings up menu to set the default script from proj file
 M.set_default = function()
     if config.proj_file_exists ~= false then
         local options = {}
@@ -186,7 +216,6 @@ M.set_default = function()
         })
     end
 end
-
 
 -------------------------
 
