@@ -2,6 +2,7 @@ local M = {}
 
 local config = require("run.config")
 
+-- do any preprocessing to the cmd string
 M.fmt_cmd = function(cmd)
     if string.find(cmd, "%%f") then
         cmd = string.gsub(cmd, "%%f", vim.api.nvim_buf_get_name(0))
@@ -10,6 +11,7 @@ M.fmt_cmd = function(cmd)
     return cmd
 end
 
+-- run a cmd, either in term, vim command, or a lua function that optionally returns one of those
 M.run_cmd = function(cmd)
     if type(cmd) == "function" then
       cmd = cmd()
@@ -29,6 +31,7 @@ M.run_cmd = function(cmd)
     term.scratch({ cmd = cmd })
 end
 
+-- write config.proj to run.nvim.lua
 function M.write_conf()
     local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     local file = io.open(proj_file, "w")
