@@ -4,7 +4,6 @@ local utils = require("run.utils")
 local config = require("run.config")
 
 M.setup = function(opts)
-    
     -- initialize all config variables and stuff
     config.setup(opts)
 
@@ -22,7 +21,6 @@ M.setup = function(opts)
 
     -- global stuff if proj file exists
     if config.proj_file_exists then
-
         -- set default command
         vim.api.nvim_create_user_command("RunSetDefault", function()
             M.set_default()
