@@ -25,11 +25,6 @@ M.setup = function(opts)
         vim.api.nvim_create_user_command("RunSetDefault", function()
             M.set_default()
         end, { desc = "Set a Default Script" })
-
-        -- reload proj command
-        vim.api.nvim_create_user_command("RunReloadProj", function()
-            M.reload_proj()
-        end, { desc = "Reload run.nvim.lua" })
     end
 
     -- keymaps and user commands that should only be on in an active buffer
@@ -50,6 +45,11 @@ M.setup = function(opts)
                 vim.keymap.set("n", config.opts.keys["run_proj"], function() M.run_proj() end,
                     { buffer = true, noremap = true, silent = false })
             end
+
+            -- reload proj command
+            vim.api.nvim_create_user_command("RunReloadProj", function()
+                M.reload_proj()
+            end, { desc = "Reload run.nvim.lua" })
         end
     })
 end
