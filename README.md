@@ -2,12 +2,13 @@
 
 A Neovim plugin for running scripts and commands with smart context awareness and project-specific configurations.
 
-## Project Description
+## Features
 
-`run.nvim` is a Neovim plugin that allows you to run scripts and commands directly from your Neovim editor. It provides a flexible and customizable way to execute commands based on:
-1. The current filetype
-2. Project-specific configurations
-3. User-defined defaults
+- Run commands based on filetype or project configuration
+- Command chaining with error handling
+- Environment variable support per command
+- Conditional command execution
+- Wait conditions for dependent commands
 
 ## Installation
 
@@ -21,17 +22,6 @@ Using `lazy.nvim`:
   opts = {},
 }
 ```
-
-## Core Features
-
-- **Filetype-Based Execution**: Automatically runs appropriate commands based on file type
-- **Project-Specific Configurations**: Define custom commands per project
-- **Default Script Selection**: Set and use default commands for quick access
-- **Command Types Support**:
-  - Shell commands (run in floating terminal)
-  - Vim commands (prefixed with `:`)
-  - Lua functions (that return either of the above)
-- **File Path Substitution**: Use `%f` to reference the current file path
 
 ## Usage
 
@@ -48,146 +38,130 @@ Using `lazy.nvim`:
 - `:RunSetDefault`: Set a default script for the current project
 - `:RunReloadProj`: Reload the project configuration file
 
-## Plugin Flow
-
-### 1. Command Execution Flow
-
-When you trigger a run command (`<leader>rr` or `:Run`), the plugin follows this decision tree:
-
-1. **Check for Project Config**:
-   - If no `run.nvim.lua` exists:
-     - Run filetype-specific default command
-   - If `run.nvim.lua` exists:
-     - If project default is set:
-       - Run the default project command
-     - If no default:
-       - Show project script selection menu
-
-2. **Project Script Menu** (`<leader>rt`):
-   - Lists all available scripts for current context
-   - Filters scripts based on filetype if specified
-   - Includes "Default for Filetype" option if available
-   - Single option is executed immediately
-   - Multiple options show selection menu
-
-### 2. Command Types and Processing
-
-Commands can be specified in three ways:
-
-1. **Shell Commands**:
-   ```lua
-   cmd = "python3 main.py"
-   ```
-   - Executed in floating terminal via FTerm
-   - Supports `%f` substitution for current file path
-
-2. **Vim Commands**:
-   ```lua
-   cmd = ":PeekOpen"
-   ```
-   - Prefixed with `:`
-   - Executed directly as Vim commands
-
-3. **Lua Functions**:
-   ```lua
-   cmd = function()
-     -- Do some processing
-     if vim.fn.filereadable("tests") == 1 then
-       return "cargo test"    -- Return shell command
-     elseif vim.fn.filereadable("doc") == 1 then
-       return ":Telescope help_tags"  -- Return vim command
-     end
-     -- Return nil to do nothing
-     return nil
-   end
-   ```
-   - Can return:
-     - A shell command string (run in terminal)
-     - A vim command string (prefixed with `:`)
-     - `nil` to perform no action
-   - Useful for dynamic command selection based on context
-
 ## Project Configuration
 
-### Location and Loading
+The plugin uses a `run.nvim.lua` file for project-specific configurations. Here are some examples:
 
-- Plugin searches for `run.nvim.lua` in current and parent directories
-- Reloads configuration on directory changes
-- Can be manually reloaded with `:RunReloadProj`
-
-### Configuration Format
+### Basic Commands
 
 ```lua
 return {
-  -- Basic shell command
-  cmd_a = {
-    name = "Run Python Script",
-    cmd = "python3 main.py"
-  },
+    -- Simple command
+    test = {
+        name = "Run Tests",
+        cmd = "npm test"
+    },
 
-  -- Command with current file
-  cmd_b = {
-    name = "Compile Current File",
-    cmd = "gcc %f -o output"
-  },
-
-  -- Filetype-specific command
-  cmd_c = {
-    name = "Run Tests",
-    cmd = "cargo test",
-    filetype = "rust"  -- Only shown for Rust files
-  },
-
-  -- Vim command
-  cmd_d = {
-    name = "Format File",
-    cmd = ":FormatWrite"
-  },
-
-  -- Dynamic command using Lua
-  cmd_e = {
-    name = "Custom Build",
-    cmd = function()
-      local file = vim.fn.expand("%:p")
-      if vim.fn.filereadable(file) == 0 then
-        vim.notify("No file to build", vim.log.levels.ERROR)
-        return nil
-      end
-      return "make " .. file
-    end
-  },
-
-  -- Optional: Set default command
-  default = "cmd_a"  -- Will run "Run Python Script" by default
+    -- Command with current file
+    compile = {
+        name = "Compile File",
+        cmd = "gcc %f -o out"  -- %f is replaced with current file path
+    }
 }
 ```
 
-### Error Handling
+### Command Chaining
 
-The plugin includes comprehensive error handling for:
-- Missing or invalid configurations
-- Failed command execution
-- Invalid file paths
-- Missing dependencies
-- Runtime errors in Lua functions
-
-All errors are reported through Neovim's notification system.
-
-## Customization
-
-The plugin can be customized during setup:
+Commands can be chained by using an array:
 
 ```lua
-require('run').setup({
-  keys = {
-    run = "<leader>rr",      -- Change main run keybinding
-    run_proj = "<leader>rt", -- Change project menu keybinding
-  },
-  -- Add filetype-specific default commands
-  filetype = {
-    python = "python3 %f",
-    rust = "cargo run",
-    cpp = "g++ %f -o out && ./out",
-    -- Add more as needed
-  }
-})
+return {
+    -- Basic command chain
+    build_and_test = {
+        name = "Build and Test",
+        cmd = {
+            "npm run build",
+            "npm test"
+        }
+    },
+
+    -- Advanced chain with error handling
+    deploy = {
+        name = "Deploy Application",
+        cmd = {
+            {
+                cmd = "npm run lint",
+                continue_on_error = true  -- Continue even if linting fails
+            },
+            {
+                cmd = "npm run build",
+                -- Only run if package.json exists
+                when = function()
+                    return vim.fn.filereadable("package.json") == 1
+                end,
+                -- Set environment for this command
+                env = {
+                    NODE_ENV = "production"
+                }
+            },
+            -- Callbacks for the chain
+            on_success = function()
+                vim.notify("Deploy completed!", vim.log.levels.INFO)
+            end,
+            on_error = function(failed_cmd)
+                vim.notify("Deploy failed at: " .. failed_cmd, vim.log.levels.ERROR)
+            end
+        }
+    },
+
+    -- Chain with dependencies
+    test_with_db = {
+        name = "Test with Database",
+        cmd = {
+            {
+                cmd = "docker-compose up -d db",
+                -- Wait for database to be ready
+                wait_for = function()
+                    return vim.fn.system("docker-compose ps db | grep healthy")
+                end,
+                timeout = 30  -- seconds
+            },
+            "npm run test",
+            {
+                cmd = "docker-compose down",
+                always_run = true  -- Run even if tests fail
+            }
+        }
+    }
+}
+```
+
+### Command Options
+
+When using command chains, each command can have these options:
+
+- `cmd`: The command to run (string or function)
+- `when`: Function that returns true if command should run
+- `continue_on_error`: Continue chain even if this command fails
+- `always_run`: Run this command even if previous commands failed
+- `env`: Environment variables for this command
+- `wait_for`: Function that returns true when ready to proceed
+- `timeout`: Seconds to wait for wait_for condition (default: 30)
+
+Chain-level options:
+- `on_success`: Function called if all commands succeed
+- `on_error`: Function called when a command fails
+
+## Command Types
+
+Commands can be specified in three ways:
+
+1. **Shell Commands** (run in terminal):
+   ```lua
+   cmd = "npm test"
+   ```
+
+2. **Vim Commands** (prefixed with `:`):
+   ```lua
+   cmd = ":Telescope find_files"
+   ```
+
+3. **Lua Functions** (return command or nil):
+   ```lua
+   cmd = function()
+     if vim.fn.filereadable("Cargo.toml") then
+       return "cargo test"
+     end
+     return nil  -- Do nothing
+   end
+   ```
