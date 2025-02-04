@@ -92,11 +92,20 @@ Commands can be specified in three ways:
    ```lua
    cmd = function()
      -- Do some processing
-     return "python3 %f"  -- Return shell or vim command
+     if vim.fn.filereadable("tests") == 1 then
+       return "cargo test"    -- Return shell command
+     elseif vim.fn.filereadable("doc") == 1 then
+       return ":Telescope help_tags"  -- Return vim command
+     end
+     -- Return nil to do nothing
+     return nil
    end
    ```
-   - Must return either shell or vim command string
-   - Can return nil to cancel execution
+   - Can return:
+     - A shell command string (run in terminal)
+     - A vim command string (prefixed with `:`)
+     - `nil` to perform no action
+   - Useful for dynamic command selection based on context
 
 ## Project Configuration
 
