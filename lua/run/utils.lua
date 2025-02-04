@@ -143,13 +143,37 @@ M.run_cmd = function(cmd)
     return true
 end
 
+-- Process environment variables for the command chain
+local function process_environment(env_config)
+    if not env_config then return {} end
+    
+    local env = {}
+    for k, v in pairs(env_config) do
+        if type(v) == "function" then
+            env[k] = v()
+        elseif type(v) == "table" then
+            if v.when and v.when() then
+                env[k] = v.value
+            elseif v.prompt then
+                if v.type == "secret" then
+                    env[k] = vim.fn.inputsecret(v.prompt .. ": ")
+                else
+                    env[k] = vim.fn.input(v.prompt .. ": ")
+                end
+            end
+        else
+            env[k] = v
+        end
+    end
+    return env
+end
+
 -- Handle a chain of commands
 M.run_command_chain = function(commands)
     local callbacks = {}
     local shell_commands = {}
-    local chain_env = {}
 
-    -- Extract callbacks and chain-wide env
+    -- Extract callbacks if they exist
     for i = #commands, 1, -1 do
         local cmd = commands[i]
         if type(cmd) == "table" then
@@ -158,10 +182,6 @@ M.run_command_chain = function(commands)
                 table.remove(commands, i)
             elseif cmd.on_error then
                 callbacks.on_error = cmd.on_error
-                table.remove(commands, i)
-            elseif cmd.env then
-                -- Process chain-wide env
-                chain_env = M.resolve_env_value(cmd.env)
                 table.remove(commands, i)
             end
         end
@@ -261,10 +281,9 @@ M.run_command_chain = function(commands)
         end
 
         local combined_cmd = table.concat(shell_commands, " && ")
-        term.scratch({ 
-            cmd = combined_cmd,
-            env = chain_env  -- Pass environment directly to FTerm
-        })
+        -- Process environment variables at chain level
+        local env = process_environment(commands.env)
+        term.scratch({ cmd = combined_cmd, env = env })
     end
 
     if callbacks.on_success then
@@ -272,40 +291,6 @@ M.run_command_chain = function(commands)
     end
 
     return true
-end
-
--- Helper function to resolve environment values
-M.resolve_env_value = function(env_config)
-    local resolved = {}
-    
-    for k, v in pairs(env_config) do
-        local value
-        if type(v) == "function" then
-            value = v()
-        elseif type(v) == "table" then
-            if v.prompt then
-                if v.type == "secret" then
-                    value = vim.fn.inputsecret(v.prompt .. ": ")
-                else
-                    value = vim.fn.input(v.prompt .. ": ")
-                end
-            elseif v.when then
-                if v.when() then
-                    value = v.value
-                end
-            else
-                value = v.value
-            end
-        else
-            value = v
-        end
-        
-        if value ~= nil then
-            resolved[k] = tostring(value)
-        end
-    end
-    
-    return resolved
 end
 
 -- write config.proj to run.nvim.lua
