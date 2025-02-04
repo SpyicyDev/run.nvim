@@ -31,7 +31,6 @@ Using `lazy.nvim`:
   - Shell commands (run in floating terminal)
   - Vim commands (prefixed with `:`)
   - Lua functions (that return either of the above)
-- **Command Chaining**: Run multiple commands in sequence or parallel
 - **File Path Substitution**: Use `%f` to reference the current file path
 
 ## Usage
@@ -49,210 +48,128 @@ Using `lazy.nvim`:
 - `:RunSetDefault`: Set a default script for the current project
 - `:RunReloadProj`: Reload the project configuration file
 
-## Command Configuration
+## Plugin Flow
 
-### Basic Commands
+### 1. Command Execution Flow
+
+When you trigger a run command (`<leader>rr` or `:Run`), the plugin follows this decision tree:
+
+1. **Check for Project Config**:
+   - If no `run.nvim.lua` exists:
+     - Run filetype-specific default command
+   - If `run.nvim.lua` exists:
+     - If project default is set:
+       - Run the default project command
+     - If no default:
+       - Show project script selection menu
+
+2. **Project Script Menu** (`<leader>rt`):
+   - Lists all available scripts for current context
+   - Filters scripts based on filetype if specified
+   - Includes "Default for Filetype" option if available
+   - Single option is executed immediately
+   - Multiple options show selection menu
+
+### 2. Command Types and Processing
+
+Commands can be specified in three ways:
+
+1. **Shell Commands**:
+   ```lua
+   cmd = "python3 main.py"
+   ```
+   - Executed in floating terminal via FTerm
+   - Supports `%f` substitution for current file path
+
+2. **Vim Commands**:
+   ```lua
+   cmd = ":PeekOpen"
+   ```
+   - Prefixed with `:`
+   - Executed directly as Vim commands
+
+3. **Lua Functions**:
+   ```lua
+   cmd = function()
+     -- Do some processing
+     if vim.fn.filereadable("tests") == 1 then
+       return "cargo test"    -- Return shell command
+     elseif vim.fn.filereadable("doc") == 1 then
+       return ":Telescope help_tags"  -- Return vim command
+     end
+     -- Return nil to do nothing
+     return nil
+   end
+   ```
+   - Can return:
+     - A shell command string (run in terminal)
+     - A vim command string (prefixed with `:`)
+     - `nil` to perform no action
+   - Useful for dynamic command selection based on context
+
+## Project Configuration
+
+### Location and Loading
+
+- Plugin searches for `run.nvim.lua` in current and parent directories
+- Reloads configuration on directory changes
+- Can be manually reloaded with `:RunReloadProj`
+
+### Configuration Format
 
 ```lua
 return {
-  -- Simple shell command
-  build = {
-    name = "Build Project",
-    cmd = "make all"
+  -- Basic shell command
+  cmd_a = {
+    name = "Run Python Script",
+    cmd = "python3 main.py"
+  },
+
+  -- Command with current file
+  cmd_b = {
+    name = "Compile Current File",
+    cmd = "gcc %f -o output"
+  },
+
+  -- Filetype-specific command
+  cmd_c = {
+    name = "Run Tests",
+    cmd = "cargo test",
+    filetype = "rust"  -- Only shown for Rust files
   },
 
   -- Vim command
-  format = {
+  cmd_d = {
     name = "Format File",
     cmd = ":FormatWrite"
   },
 
   -- Dynamic command using Lua
-  test = {
-    name = "Run Tests",
+  cmd_e = {
+    name = "Custom Build",
     cmd = function()
       local file = vim.fn.expand("%:p")
-      return "python -m pytest " .. file
-    end
-  }
-}
-```
-
-### Command Chaining
-
-The plugin supports running multiple commands either sequentially or in parallel. Here are the different ways to chain commands:
-
-#### Sequential Execution
-```lua
-return {
-  full_build = {
-    name = "Full Build Pipeline",
-    cmd = {
-      sequence = {
-        -- Simple command
-        "npm run lint",
-        
-        -- Command with conditions
-        {
-          cmd = "npm run build",
-          -- Only run if condition is met
-          when = function()
-            return vim.fn.filereadable("package.json") == 1
-          end,
-          -- Continue chain even if this fails
-          continue_on_error = true
-        },
-        
-        -- Command with environment variables
-        {
-          cmd = "docker build -t myapp .",
-          env = {
-            DOCKER_BUILDKIT = "1"
-          }
-        },
-        
-        -- Command with wait condition
-        {
-          cmd = "docker-compose up -d",
-          -- Wait for service to be ready
-          wait_for = function()
-            return vim.fn.system("docker-compose ps | grep healthy") ~= ""
-          end,
-          timeout = 30  -- seconds
-        }
-      },
-      -- Run on successful completion
-      on_success = function()
-        vim.notify("Build completed successfully!")
-      end,
-      -- Run if any command fails
-      on_error = function(failed_cmd)
-        vim.notify("Build failed at: " .. failed_cmd, vim.log.levels.ERROR)
+      if vim.fn.filereadable(file) == 0 then
+        vim.notify("No file to build", vim.log.levels.ERROR)
+        return nil
       end
-    }
-  }
+      return "make " .. file
+    end
+  },
+
+  -- Optional: Set default command
+  default = "cmd_a"  -- Will run "Run Python Script" by default
 }
 ```
 
-#### Parallel Execution
-```lua
-return {
-  dev = {
-    name = "Start Development Environment",
-    cmd = {
-      parallel = {
-        -- Simple commands run in parallel
-        "npm run watch",
-        "npm run server",
-        
-        -- Command with custom terminal configuration
-        {
-          cmd = "docker-compose up",
-          terminal = {
-            position = "right",
-            size = 0.4
-          }
-        }
-      }
-    }
-  }
-}
-```
+### Error Handling
 
-#### Mixed Execution
-```lua
-return {
-  deploy = {
-    name = "Deploy Application",
-    cmd = {
-      sequence = {
-        -- First run tests
-        "npm test",
-        
-        -- Then run build and docs in parallel
-        {
-          parallel = {
-            "npm run build",
-            "npm run docs"
-          }
-        },
-        
-        -- Finally deploy
-        {
-          cmd = "npm run deploy",
-          -- Always run this command for cleanup
-          always_run = true
-        }
-      }
-    }
-  }
-}
-```
-
-### Command Options
-
-#### Sequential Commands
-- `when`: Function that returns boolean, determines if command should run
-- `continue_on_error`: Boolean, continue chain even if this command fails
-- `env`: Table of environment variables for this command
-- `wait_for`: Function that returns boolean, waits until condition is met
-- `timeout`: Number of seconds to wait for `wait_for` condition
-- `always_run`: Boolean, run this command even if previous commands failed
-
-#### Parallel Commands
-- `terminal`: Configure terminal display
-  - `position`: Where to place terminal ("left", "right", "top", "bottom")
-  - `size`: Size of terminal (0-1 for percentage)
-
-#### Chain-Level Options
-- `on_success`: Function to run after successful completion
-- `on_error`: Function to run when a command fails
-- `continue_on_error`: Boolean, apply to all commands in chain
-
-### Environment Variables
-
-Environment variables can be specified in several ways:
-
-```lua
-return {
-  test = {
-    name = "Run Tests",
-    cmd = {
-      sequence = {
-        {
-          cmd = "npm test",
-          env = {
-            -- Static value
-            NODE_ENV = "test",
-            
-            -- Dynamic value
-            TEST_DB = function()
-              return vim.fn.getcwd() .. "/test.db"
-            end,
-            
-            -- Conditional value
-            DEBUG = {
-              value = "1",
-              condition = function()
-                return vim.fn.exists("$CI") == 0
-              end
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-## Error Handling
-
-The plugin includes comprehensive error handling:
-- Failed commands in a chain are reported with specific error messages
-- Timeout conditions for long-running commands
-- Environment variable validation
-- Command validation before execution
-- Terminal creation error handling
+The plugin includes comprehensive error handling for:
+- Missing or invalid configurations
+- Failed command execution
+- Invalid file paths
+- Missing dependencies
+- Runtime errors in Lua functions
 
 All errors are reported through Neovim's notification system.
 
@@ -271,6 +188,6 @@ require('run').setup({
     python = "python3 %f",
     rust = "cargo run",
     cpp = "g++ %f -o out && ./out",
+    -- Add more as needed
   }
 })
-```

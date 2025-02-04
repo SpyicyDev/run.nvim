@@ -2,7 +2,6 @@ local M = {}
 
 local utils = require("run.utils")
 local config = require("run.config")
-local chain = require("run.chain")
 
 M.setup = function(opts)
     if not opts then opts = {} end
@@ -69,6 +68,7 @@ M.setup_proj = function()
     local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     if proj_file ~= "" then
         config.proj = dofile(proj_file)
+
         config.proj_file_exists = true
     else
         config.proj_file_exists = false
@@ -125,6 +125,7 @@ M.run_file = function()
 
     local exec = config.opts.filetype[ftype]
 
+    -- don't do anything if filetype is not set
     if exec ~= nil then
         utils.run_cmd(exec)
     else
@@ -183,27 +184,22 @@ M.run_proj = function()
             return
         end
 
-        local cmd_config
+        local exec
         for _, entry in pairs(config.proj) do
-            if type(entry) == "table" and entry.name == options[1] then
-                cmd_config = entry
+            if type(entry) == "table" and entry.name == options[1] and entry.cmd then
+                exec = entry.cmd
                 break
             end
         end
 
-        if not cmd_config or not cmd_config.cmd then
-            vim.notify("Invalid command configuration for " .. options[1], vim.log.levels.ERROR, {
+        if not exec then
+            vim.notify("Command not found for " .. options[1], vim.log.levels.ERROR, {
                 title = "run.nvim"
             })
             return
         end
 
-        -- Handle command chains
-        if type(cmd_config.cmd) == "table" then
-            chain.execute(cmd_config.cmd)
-        else
-            utils.run_cmd(cmd_config.cmd)
-        end
+        utils.run_cmd(exec)
         return
     end
 
@@ -217,27 +213,22 @@ M.run_proj = function()
             return
         end
 
-        local cmd_config
+        local exec
         for _, entry in pairs(config.proj) do
-            if type(entry) == "table" and entry.name == choice then
-                cmd_config = entry
+            if type(entry) == "table" and entry.name == choice and entry.cmd then
+                exec = entry.cmd
                 break
             end
         end
 
-        if not cmd_config or not cmd_config.cmd then
-            vim.notify("Invalid command configuration for " .. choice, vim.log.levels.ERROR, {
+        if not exec then
+            vim.notify("Command not found for " .. choice, vim.log.levels.ERROR, {
                 title = "run.nvim"
             })
             return
         end
 
-        -- Handle command chains
-        if type(cmd_config.cmd) == "table" then
-            chain.execute(cmd_config.cmd)
-        else
-            utils.run_cmd(cmd_config.cmd)
-        end
+        utils.run_cmd(exec)
     end)
 end
 
@@ -257,20 +248,96 @@ M.run_proj_default = function()
         return
     end
 
-    local cmd_config = config.proj[config.proj.default]
-    if not cmd_config or not cmd_config.cmd then
+    local default_entry = config.proj[config.proj.default]
+    if not default_entry or not default_entry.cmd then
         vim.notify("Invalid default script configuration", vim.log.levels.ERROR, {
             title = "run.nvim"
         })
         return
     end
 
-    -- Handle command chains
-    if type(cmd_config.cmd) == "table" then
-        chain.execute(cmd_config.cmd)
-    else
-        utils.run_cmd(cmd_config.cmd)
+    utils.run_cmd(default_entry.cmd)
+end
+
+-- brings up menu to set the default script from proj file
+M.set_default = function()
+    if not config.proj_file_exists then
+        vim.notify("No project configuration file found", vim.log.levels.ERROR, {
+            title = "run.nvim"
+        })
+        return
     end
+
+    if not config.proj then
+        vim.notify("Project configuration not available", vim.log.levels.ERROR, {
+            title = "run.nvim"
+        })
+        return
+    end
+
+    local options = {}
+    for _, entry in pairs(config.proj) do
+        if type(entry) == "table" and entry.name then
+            table.insert(options, entry.name)
+        end
+    end
+
+    if #options == 0 then
+        vim.notify("No available scripts found", vim.log.levels.WARN, {
+            title = "run.nvim"
+        })
+        return
+    end
+
+    if config.proj.default ~= nil then
+        table.insert(options, "Clear Default")
+    end
+
+    vim.ui.select(options, {
+        prompt = "Choose a default script..."
+    }, function(choice)
+        if not choice then return end
+
+        if choice == "Clear Default" then
+            config.proj.default = nil
+            utils.write_conf()
+            M.reload_proj()
+            vim.notify("Default script cleared", vim.log.levels.INFO, {
+                title = "run.nvim"
+            })
+            return
+        end
+
+        for title, entry in pairs(config.proj) do
+            if type(entry) == "table" and entry.name == choice then
+                config.proj.default = title
+                break
+            end
+        end
+
+        if not config.proj.default then
+            vim.notify("Failed to set default script", vim.log.levels.ERROR, {
+                title = "run.nvim"
+            })
+            return
+        end
+
+        utils.write_conf()
+        M.reload_proj()
+        vim.notify("Default script set to " .. choice, vim.log.levels.INFO, {
+            title = "run.nvim"
+        })
+    end)
+end
+
+-------------------------
+
+M.dump_opts = function()
+    print(require("inspect").inspect(config.opts))
+end
+
+M.dump_proj = function()
+    print(require("inspect").inspect(config.proj))
 end
 
 return M
