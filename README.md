@@ -142,6 +142,96 @@ Chain-level options:
 - `on_success`: Function called if all commands succeed
 - `on_error`: Function called when a command fails
 
+## Environment Variables
+
+The plugin supports several ways to handle environment variables:
+
+1. **Static Environment Variables**:
+```lua
+return {
+    build = {
+        name = "Build Project",
+        cmd = "npm run build",
+        env = {
+            NODE_ENV = "production",
+            DEBUG = "0"
+        }
+    }
+}
+```
+
+2. **Dynamic Environment Variables**:
+```lua
+return {
+    test = {
+        name = "Run Tests",
+        cmd = "npm test",
+        env = {
+            -- Function that returns a value
+            TEST_DIR = function()
+                return vim.fn.expand("%:p:h")
+            end,
+            -- Conditional environment variable
+            DEBUG = {
+                condition = function()
+                    return vim.fn.filereadable(".debug") == 1
+                end,
+                value = "1"
+            }
+        }
+    }
+}
+```
+
+3. **Interactive Environment Variables**:
+```lua
+return {
+    deploy = {
+        name = "Deploy to Server",
+        cmd = "deploy.sh",
+        env_prompt = {
+            SERVER_URL = {
+                description = "Server URL",
+                required = true,
+                default = "https://staging.example.com",
+                validate = function(value)
+                    return value:match("^https?://") ~= nil
+                end
+            },
+            API_KEY = {
+                description = "API Key",
+                required = true,
+                force = true  -- Always prompt, even if already set
+            },
+            ENV = {
+                description = "Environment",
+                default = "staging",
+                completion = "customlist,CompletionFunction"
+            }
+        }
+    }
+}
+```
+
+Environment variable options:
+
+- **Static Values**: Direct string assignments
+- **Dynamic Values**: Functions that return values
+- **Conditional Values**: Tables with `condition` and `value`
+- **Interactive Prompts**:
+  - `description`: Prompt text
+  - `required`: If true, value must be provided
+  - `default`: Default value
+  - `force`: Always prompt, even if variable exists
+  - `completion`: Vim completion function
+  - `validate`: Function to validate input
+
+Environment variables are:
+1. Set before command execution
+2. Available to all commands in a chain
+3. Automatically escaped for shell safety
+4. Cleared after command completion
+
 ## Command Types
 
 Commands can be specified in three ways:
