@@ -143,11 +143,78 @@ M.run_cmd = function(cmd)
     return true
 end
 
+-- Process environment variables and return env command
+M.process_environment = function(chain_env, cmd_env)
+    local env_args = {}
+    
+    -- Helper to resolve environment value
+    local function resolve_value(value)
+        if type(value) == "function" then
+            return value()
+        elseif type(value) == "table" then
+            if value.prompt then
+                -- Handle user prompt
+                if value.type == "secret" then
+                    return vim.fn.inputsecret(value.prompt .. ": ")
+                else
+                    return vim.fn.input(value.prompt .. ": ")
+                end
+            elseif value.when then
+                -- Handle conditional value
+                if value.when() then
+                    return value.value
+                end
+                return nil
+            end
+        end
+        return value
+    end
+
+    -- Process chain-wide environment first
+    if chain_env then
+        for k, v in pairs(chain_env) do
+            local resolved = resolve_value(v)
+            if resolved ~= nil then
+                env_args[k] = resolved
+            end
+        end
+    end
+
+    -- Process command-specific environment (overrides chain-wide)
+    if cmd_env then
+        for k, v in pairs(cmd_env) do
+            local resolved = resolve_value(v)
+            if resolved ~= nil then
+                env_args[k] = resolved
+            end
+        end
+    end
+
+    -- If no environment variables, return empty string
+    if vim.tbl_count(env_args) == 0 then
+        return ""
+    end
+
+    -- Build env command
+    local env_cmd = "env"
+    for k, v in pairs(env_args) do
+        env_cmd = env_cmd .. " " .. k .. "=" .. vim.fn.shellescape(tostring(v))
+    end
+
+    return env_cmd .. " "  -- Add space after env command
+end
+
 -- Handle a chain of commands
 M.run_command_chain = function(commands)
     local callbacks = {}
     local shell_commands = {}
-    local current_env = {}
+    
+    -- Extract chain-wide environment if present
+    local chain_env = nil
+    if type(commands) == "table" and commands.env then
+        chain_env = commands.env
+        commands = commands.cmd
+    end
 
     -- Extract callbacks if they exist
     for i = #commands, 1, -1 do
@@ -190,15 +257,10 @@ M.run_command_chain = function(commands)
             end
         end
 
-        -- Handle environment variables
-        if type(cmd) == "table" and cmd.env then
-            for k, v in pairs(cmd.env) do
-                table.insert(shell_commands, string.format("export %s=%s", k, vim.fn.shellescape(v)))
-            end
-        end
-
         -- Process the command
         local cmd_str
+        local cmd_env = nil
+        
         if type(cmd) == "string" then
             cmd_str = cmd
         elseif type(cmd) == "table" and cmd.cmd then
@@ -217,6 +279,7 @@ M.run_command_chain = function(commands)
             else
                 cmd_str = cmd.cmd
             end
+            cmd_env = cmd.env
         elseif type(cmd) == "function" then
             local success, result = pcall(cmd)
             if not success then
@@ -241,11 +304,13 @@ M.run_command_chain = function(commands)
                     end
                 end
             else
-                -- Format the command with error handling
+                -- Format the command with error handling and environment
                 local error_check = type(cmd) == "table" and cmd.continue_on_error and "|| true" or ""
                 cmd_str = M.fmt_cmd(cmd_str)
                 if cmd_str then
-                    table.insert(shell_commands, cmd_str .. " " .. error_check)
+                    -- Add environment variables using env command
+                    local env_prefix = M.process_environment(chain_env, cmd_env)
+                    table.insert(shell_commands, env_prefix .. cmd_str .. " " .. error_check)
                 end
             end
         end

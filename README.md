@@ -142,6 +142,126 @@ Chain-level options:
 - `on_success`: Function called if all commands succeed
 - `on_error`: Function called when a command fails
 
+## Environment Variables
+
+The plugin supports both chain-wide and command-specific environment variables:
+
+### Chain-wide Environment
+
+Variables that apply to all commands in the chain:
+
+```lua
+return {
+    test = {
+        name = "Run Tests",
+        -- Chain-wide environment
+        env = {
+            NODE_ENV = "test",
+            DEBUG = "1"
+        },
+        cmd = {
+            "npm run lint",  -- Will run with NODE_ENV=test DEBUG=1
+            "npm test"      -- Will also run with same env
+        }
+    }
+}
+```
+
+### Command-specific Environment
+
+Override or add environment variables for specific commands:
+
+```lua
+return {
+    deploy = {
+        name = "Deploy",
+        env = {
+            NODE_ENV = "production"  -- Chain-wide
+        },
+        cmd = {
+            "npm run build",         -- Uses chain-wide env
+            {
+                cmd = "npm run deploy",
+                env = {
+                    DEPLOY_TARGET = "prod",  -- Command-specific
+                    NODE_ENV = "staging"     -- Overrides chain-wide
+                }
+            }
+        }
+    }
+}
+```
+
+### Dynamic Environment Variables
+
+Environment variables can be:
+
+1. **Static Values**:
+```lua
+env = {
+    NODE_ENV = "production"
+}
+```
+
+2. **Dynamic Functions**:
+```lua
+env = {
+    WORKSPACE = function()
+        return vim.fn.getcwd()
+    end
+}
+```
+
+3. **Conditional Values**:
+```lua
+env = {
+    DEBUG = {
+        value = "1",
+        when = function()
+            return vim.fn.filereadable(".debug") == 1
+        end
+    }
+}
+```
+
+4. **User Prompts**:
+```lua
+env = {
+    API_KEY = {
+        prompt = "Enter API Key",
+        type = "secret"  -- Hides input
+    },
+    LOG_LEVEL = {
+        prompt = "Enter log level"
+    }
+}
+```
+
+### Implementation Details
+
+- Environment variables are implemented using the `env` command
+- Command-specific variables override chain-wide variables
+- Nil or false values from dynamic/conditional variables are skipped
+- Values are properly shell-escaped
+- Secret prompts hide user input
+
+Example of generated command:
+```bash
+# From configuration:
+{
+    env = { NODE_ENV = "test" },
+    cmd = {
+        {
+            cmd = "npm test",
+            env = { DEBUG = "1" }
+        }
+    }
+}
+
+# Generated command:
+env NODE_ENV=test DEBUG=1 npm test
+```
+
 ## Command Types
 
 Commands can be specified in three ways:
