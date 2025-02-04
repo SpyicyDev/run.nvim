@@ -1,7 +1,6 @@
 local M = {}
 
 local config = require("run.config")
-local env = require("run.env")
 
 -- do any preprocessing to the cmd string
 M.fmt_cmd = function(cmd)
@@ -148,7 +147,7 @@ end
 M.run_command_chain = function(commands)
     local callbacks = {}
     local shell_commands = {}
-    local chain_env = {}
+    local current_env = {}
 
     -- Extract callbacks if they exist
     for i = #commands, 1, -1 do
@@ -192,24 +191,9 @@ M.run_command_chain = function(commands)
         end
 
         -- Handle environment variables
-        if type(cmd) == "table" then
-            -- Process environment variables
-            if cmd.env then
-                local cmd_env = env.process_env(cmd.env)
-                for k, v in pairs(cmd_env) do
-                    chain_env[k] = v
-                end
-            end
-
-            -- Handle environment prompts
-            if cmd.env_prompt then
-                local prompt_env = env.get_env_prompt(cmd.env_prompt)
-                if not prompt_env then
-                    return false
-                end
-                for k, v in pairs(prompt_env) do
-                    chain_env[k] = v
-                end
+        if type(cmd) == "table" and cmd.env then
+            for k, v in pairs(cmd.env) do
+                table.insert(shell_commands, string.format("export %s=%s", k, vim.fn.shellescape(v)))
             end
         end
 
@@ -267,15 +251,6 @@ M.run_command_chain = function(commands)
         end
 
         ::continue::
-    end
-
-    -- If we have environment variables, add them to shell commands
-    if next(chain_env) then
-        local env_commands = env.format_env_for_shell(chain_env)
-        -- Insert environment commands at the start
-        for i = #env_commands, 1, -1 do
-            table.insert(shell_commands, 1, env_commands[i])
-        end
     end
 
     -- If we have shell commands, run them in a single terminal
