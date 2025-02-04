@@ -60,9 +60,86 @@ return {
 }
 ```
 
-### Command Chaining with Environment Variables
+### Command Chaining
 
-Commands can be chained and share environment variables:
+Commands can be chained by using an array:
+
+```lua
+return {
+    -- Basic command chain
+    build_and_test = {
+        name = "Build and Test",
+        cmd = {
+            "npm run build",
+            "npm test"
+        }
+    },
+
+    -- Advanced chain with error handling
+    deploy = {
+        name = "Deploy Application",
+        cmd = {
+            {
+                cmd = "npm run lint",
+                continue_on_error = true  -- Continue even if linting fails
+            },
+            {
+                cmd = "npm run build",
+                -- Only run if package.json exists
+                when = function()
+                    return vim.fn.filereadable("package.json") == 1
+                end
+            },
+            -- Callbacks for the chain
+            on_success = function()
+                vim.notify("Deploy completed!", vim.log.levels.INFO)
+            end,
+            on_error = function(failed_cmd)
+                vim.notify("Deploy failed at: " .. failed_cmd, vim.log.levels.ERROR)
+            end
+        }
+    },
+
+    -- Chain with dependencies
+    test_with_db = {
+        name = "Test with Database",
+        cmd = {
+            {
+                cmd = "docker-compose up -d db",
+                -- Wait for database to be ready
+                wait_for = function()
+                    return vim.fn.system("docker-compose ps db | grep healthy")
+                end,
+                timeout = 30  -- seconds
+            },
+            "npm run test",
+            {
+                cmd = "docker-compose down",
+                always_run = true  -- Run even if tests fail
+            }
+        }
+    }
+}
+```
+
+### Command Chain Options
+
+Each command in a chain can have these options:
+
+- `cmd`: The command to run (string or function)
+- `when`: Function that returns true if command should run
+- `continue_on_error`: Continue chain even if this command fails
+- `always_run`: Run this command even if previous commands failed
+- `wait_for`: Function that returns true when ready to proceed
+- `timeout`: Seconds to wait for wait_for condition (default: 30)
+
+Chain-level options:
+- `on_success`: Function called if all commands succeed
+- `on_error`: Function called when a command fails
+
+### Environment Variables
+
+Environment variables can be defined at the chain level and will be shared by all commands in the chain:
 
 ```lua
 return {
@@ -92,23 +169,10 @@ return {
                 type = "secret"  -- Won't show in terminal
             }
         },
-        -- Commands share the environment
         cmd = {
             "npm run lint",
             "npm test",
             "npm run e2e"
-        }
-    },
-
-    deploy = {
-        name = "Deploy",
-        env = {
-            NODE_ENV = "production",
-            DEPLOY_TARGET = "prod"
-        },
-        cmd = {
-            "npm run build",
-            "npm run deploy"
         }
     }
 }
@@ -142,17 +206,26 @@ env = {
 }
 ```
 
-### Command Options
+## Command Types
 
-Each command in a chain can have these options:
+Commands can be specified in three ways:
 
-- `when`: Function that returns true if command should run
-- `continue_on_error`: Continue chain even if this command fails
-- `always_run`: Run this command even if previous commands failed
-- `wait_for`: Function that returns true when ready to proceed
-- `timeout`: Seconds to wait for wait_for condition (default: 30)
+1. **Shell Commands** (run in terminal):
+   ```lua
+   cmd = "npm test"
+   ```
 
-Chain-level options:
-- `env`: Environment variables for all commands
-- `on_success`: Function called if all commands succeed
-- `on_error`: Function called when a command fails
+2. **Vim Commands** (prefixed with `:`):
+   ```lua
+   cmd = ":Telescope find_files"
+   ```
+
+3. **Lua Functions** (return command or nil):
+   ```lua
+   cmd = function()
+     if vim.fn.filereadable("Cargo.toml") then
+       return "cargo test"
+     end
+     return nil  -- Do nothing
+   end
+   ```
