@@ -145,8 +145,9 @@ end
 
 -- Handle a chain of commands
 M.run_command_chain = function(commands)
-    local success = true
     local callbacks = {}
+    local shell_commands = {}
+    local current_env = {}
 
     -- Extract callbacks if they exist
     for i = #commands, 1, -1 do
@@ -162,41 +163,115 @@ M.run_command_chain = function(commands)
         end
     end
 
-    -- Run each command in sequence
+    -- Process each command
     for _, cmd in ipairs(commands) do
-        local cmd_success = M.run_cmd(cmd)
-        
-        if not cmd_success then
-            success = false
-            if type(cmd) == "table" then
-                if callbacks.on_error then
-                    callbacks.on_error(cmd.cmd or cmd)
+        -- Skip if condition not met
+        if type(cmd) == "table" and cmd.when and not cmd.when() then
+            goto continue
+        end
+
+        -- Handle wait conditions
+        if type(cmd) == "table" and cmd.wait_for then
+            local start_time = vim.loop.now()
+            local timeout = (cmd.timeout or 30) * 1000 -- Convert to ms
+            
+            while vim.loop.now() - start_time < timeout do
+                if cmd.wait_for() then
+                    break
                 end
-            else
-                if callbacks.on_error then
-                    callbacks.on_error(cmd)
-                end
+                vim.loop.sleep(1000) -- Check every second
             end
             
-            -- Check if we should continue
-            if not (type(cmd) == "table" and cmd.continue_on_error) then
-                break
+            if vim.loop.now() - start_time >= timeout then
+                vim.notify("Timeout waiting for condition", vim.log.levels.ERROR, {
+                    title = "run.nvim"
+                })
+                return false
             end
         end
 
-        -- Handle always_run commands even if previous failed
-        if not success and type(cmd) == "table" and not cmd.always_run then
-            goto continue
+        -- Handle environment variables
+        if type(cmd) == "table" and cmd.env then
+            for k, v in pairs(cmd.env) do
+                table.insert(shell_commands, string.format("export %s=%s", k, vim.fn.shellescape(v)))
+            end
+        end
+
+        -- Process the command
+        local cmd_str
+        if type(cmd) == "string" then
+            cmd_str = cmd
+        elseif type(cmd) == "table" and cmd.cmd then
+            if type(cmd.cmd) == "function" then
+                local success, result = pcall(cmd.cmd)
+                if not success then
+                    if callbacks.on_error then
+                        callbacks.on_error("Error in function: " .. tostring(result))
+                    end
+                    if not cmd.continue_on_error then
+                        return false
+                    end
+                    goto continue
+                end
+                cmd_str = result
+            else
+                cmd_str = cmd.cmd
+            end
+        elseif type(cmd) == "function" then
+            local success, result = pcall(cmd)
+            if not success then
+                if callbacks.on_error then
+                    callbacks.on_error("Error in function: " .. tostring(result))
+                end
+                goto continue
+            end
+            cmd_str = result
+        end
+
+        if cmd_str then
+            -- Handle vim commands separately
+            if cmd_str:sub(1, 1) == ":" then
+                local success, err = pcall(vim.cmd, cmd_str:sub(2))
+                if not success then
+                    if callbacks.on_error then
+                        callbacks.on_error("Error in vim command: " .. tostring(err))
+                    end
+                    if not (type(cmd) == "table" and cmd.continue_on_error) then
+                        return false
+                    end
+                end
+            else
+                -- Format the command with error handling
+                local error_check = type(cmd) == "table" and cmd.continue_on_error and "|| true" or ""
+                cmd_str = M.fmt_cmd(cmd_str)
+                if cmd_str then
+                    table.insert(shell_commands, cmd_str .. " " .. error_check)
+                end
+            end
         end
 
         ::continue::
     end
 
-    if success and callbacks.on_success then
+    -- If we have shell commands, run them in a single terminal
+    if #shell_commands > 0 then
+        local term = require("FTerm")
+        if not term then
+            vim.notify("FTerm not found. Make sure it's installed", vim.log.levels.ERROR, {
+                title = "run.nvim"
+            })
+            return false
+        end
+
+        local combined_cmd = table.concat(shell_commands, " && ")
+        term.scratch({ cmd = combined_cmd })
+    end
+
+    if callbacks.on_success then
         callbacks.on_success()
     end
 
-    return success
+    return true
 end
 
 -- write config.proj to run.nvim.lua
