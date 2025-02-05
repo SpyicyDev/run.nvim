@@ -3,6 +3,8 @@ local M = {}
 local utils = require("run.utils")
 local config = require("run.config")
 
+--- Initialize the plugin with the given options
+---@param opts table|nil Configuration options for the plugin
 M.setup = function(opts)
     if not opts then opts = {} end
     -- initialize all config variables and stuff
@@ -63,7 +65,8 @@ M.setup = function(opts)
     })
 end
 
--- Simplified project configuration loading
+--- Load and parse the project configuration file (run.nvim.lua)
+---@return nil
 M.setup_proj = function()
     local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     config.proj_file_exists = proj_file ~= ""
@@ -78,7 +81,8 @@ M.setup_proj = function()
     end
 end
 
--- reload proj file
+--- Reload the project configuration file and reset the configuration state
+---@return nil
 M.reload_proj = function()
     config.proj = {}
     M.setup_proj()
@@ -88,7 +92,10 @@ M.reload_proj = function()
     })
 end
 
--- Unified command execution
+--- Execute a command based on its type
+---@param cmd_type string The type of command to execute ('file', 'proj', or 'proj_default')
+---@param options table|nil Additional options for command execution
+---@return boolean|nil success Whether the command executed successfully
 local execute_command = function(cmd_type, options)
     if cmd_type == "file" then
         return M.run_file()
@@ -99,7 +106,9 @@ local execute_command = function(cmd_type, options)
     end
 end
 
--- Main run method
+--- Main entry point for running commands
+--- Determines whether to run a file-specific command or project command
+---@return boolean|nil success Whether the command executed successfully
 M.run = function()
     if not config.proj_file_exists then
         return execute_command("file")
@@ -108,7 +117,8 @@ M.run = function()
     return execute_command(config.proj.default and "proj_default" or "proj")
 end
 
--- run the default script for the filetype
+--- Run the default script for the current file's filetype
+---@return nil
 M.run_file = function()
     local buf = vim.api.nvim_buf_get_name(0)
     if not buf then
@@ -153,7 +163,9 @@ M.run_file = function()
     end
 end
 
--- run a script from the proj table
+--- Run a script from the project configuration
+--- Shows a selection menu if multiple scripts are available
+---@return nil
 M.run_proj = function()
     if not config.proj then
         vim.notify("Project configuration not available", vim.log.levels.ERROR, {
@@ -248,7 +260,8 @@ M.run_proj = function()
     end)
 end
 
--- run the default script from the proj file
+--- Run the default script from the project configuration
+---@return nil
 M.run_proj_default = function()
     if not config.proj then
         vim.notify("Project configuration not available", vim.log.levels.ERROR, {
@@ -275,7 +288,8 @@ M.run_proj_default = function()
     utils.run_cmd(config.proj.default)
 end
 
--- brings up menu to set the default script from proj file
+--- Brings up a menu to set the default script from the project configuration
+---@return nil
 M.set_default = function()
     if not config.proj_file_exists then
         vim.notify("No project configuration file found", vim.log.levels.ERROR, {
@@ -348,10 +362,14 @@ end
 
 -------------------------
 
+--- Dump the plugin's configuration options
+---@return nil
 M.dump_opts = function()
     print(require("inspect").inspect(config.opts))
 end
 
+--- Dump the project configuration
+---@return nil
 M.dump_proj = function()
     print(require("inspect").inspect(config.proj))
 end

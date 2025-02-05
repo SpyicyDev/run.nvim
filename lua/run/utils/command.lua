@@ -121,22 +121,27 @@ end
 
 -- Public API
 
----Format command with preprocessing
----@param cmd string The command to format
+---Format and validate a command string
+---@param cmd string The command string to format
 ---@return string|nil formatted_cmd The formatted command or nil if invalid
 M.fmt_cmd = function(cmd)
-    return preprocess_cmd(cmd)
+    local ret_cmd = preprocess_cmd(cmd)
+    if not ret_cmd then return nil end
+    return ret_cmd
 end
 
----Execute a single command
+---Execute a single command with environment variables
 ---@param cmd string The command to execute
 ---@param env_vars table|nil Environment variables for the command
 ---@return boolean success Whether the command executed successfully
 M.execute_single_cmd = function(cmd, env_vars)
-    return execute_single_cmd(cmd, env_vars)
+    if cmd:sub(1, 1) == ":" then
+        return execute_vim_cmd(cmd)
+    end
+    return execute_shell_cmd(cmd, env_vars)
 end
 
----Process command section and execute
+---Execute a command from the project configuration
 ---@param cmd_section string The command section to execute
 ---@return boolean success Whether the command executed successfully
 M.run_cmd = function(cmd_section)

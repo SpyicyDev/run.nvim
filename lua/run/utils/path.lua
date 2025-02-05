@@ -2,6 +2,8 @@ local M = {}
 
 local config = require("run.config")
 
+---Write the current project configuration to the run.nvim.lua file
+---@return nil
 function M.write_conf()
     local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     if not proj_file or proj_file == "" then
