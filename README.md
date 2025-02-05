@@ -195,8 +195,69 @@ Chain-level options:
 
 ### Environment Variables
 
-Environment variables are specified at the run configuration level and apply to the entire configuration's environment(all commands in a chain execute in this environment):
+Environment variables can be specified at the run configuration level and apply to the entire configuration's environment (all commands in a chain execute in this environment). The environment variables system supports both static and dynamic configurations:
 
+1. **Static Environment Variables**:
+```lua
+return {
+    test = {
+        name = "Run Tests",
+        env = {
+            NODE_ENV = "test",
+            DEBUG = "1"
+        },
+        cmd = "npm test"
+    }
+}
+```
+
+2. **Dynamic Environment Variables** using Lua functions:
+```lua
+return {
+    build = {
+        name = "Build Project",
+        env = {
+            BUILD_TIME = function()
+                return os.date("%Y%m%d_%H%M%S")
+            end,
+            GIT_BRANCH = function()
+                local handle = io.popen("git branch --show-current")
+                local branch = handle:read("*a")
+                handle:close()
+                return string.gsub(branch, "\n", "")
+            end
+        },
+        cmd = "npm run build"
+    }
+}
+```
+
+3. **Conditional Environment Variables** using tables with conditions:
+```lua
+return {
+    deploy = {
+        name = "Deploy",
+        env = {
+            NODE_ENV = {
+                value = "production",
+                when = function()
+                    return vim.fn.getcwd():match("production")
+                end,
+                default = "development"
+            },
+            DEBUG = {
+                value = "1",
+                when = function()
+                    return vim.fn.filereadable(".debug")
+                end
+            }
+        },
+        cmd = "npm run deploy"
+    }
+}
+```
+
+Environment variables are processed before command execution. For dynamic variables, the functions are called just before the command runs, ensuring up-to-date values. Conditional variables are evaluated based on their `when` function, falling back to their `default` value (if specified) when the condition is not met.
 ```lua
 return {
     test = {
@@ -223,4 +284,3 @@ return {
         cmd = "npm run build"
     }
 }
-```

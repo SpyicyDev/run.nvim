@@ -1,6 +1,7 @@
 local M = {}
 
 local config = require("run.config")
+local env = require("run.env")
 
 -- do any preprocessing to the cmd string
 M.fmt_cmd = function(cmd)
@@ -102,12 +103,12 @@ M.run_cmd = function(cmd_section)
         return false
     end
     
-    -- Get environment variables from the command section
-    local env = cmd_config.env
+    -- Process environment variables from the command section
+    local processed_env = env.process_env(cmd_config.env)
     
     term.scratch({ 
         cmd = cmd,
-        env = env
+        env = processed_env
     })
     return true
 end
@@ -225,12 +226,12 @@ M.run_command_chain = function(commands, cmd_section)
         end
 
         local combined_cmd = table.concat(shell_commands, " && ")
-        -- Get environment variables from the command section
-        local env = config.proj[cmd_section] and config.proj[cmd_section].env
+        -- Process environment variables from the command section
+        local processed_env = env.process_env(config.proj[cmd_section] and config.proj[cmd_section].env)
         
         term.scratch({ 
             cmd = combined_cmd,
-            env = env
+            env = processed_env
         })
     end
 
