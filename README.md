@@ -25,12 +25,12 @@ Using `lazy.nvim`:
 
 The following can be passed into opts:
 
-- `keys`: Customize key mappings
-  - `run`: Key for smart run command (default: `<leader>rr`)
-  - `run_proj`: Key for opening project script menu (default: `<leader>rt`)
-- `filetype`: Filetype-specific default commands
+- `keys` (table): Customize key mappings
+  - `run` (string): Key for smart run command (default: `<leader>rr`)
+  - `run_proj` (string): Key for opening project script menu (default: `<leader>rt`)
+- `filetype` (table): Filetype-specific default commands mapping filetype strings to either string commands or functions that return string commands
 
-This is an example configuration using the default keys:
+This is an example configuration using the default keybinds:
 
 ```lua
 opts = {
@@ -98,8 +98,11 @@ return {
 }
 ```
 
-Moving forward, this is the terminology to be used:
-- **Run Configuration**: an entry in the `run.nvim.lua` file
+Moving forward, this is the terminology and field types to be used:
+- **Run Configuration**: an entry in the `run.nvim.lua` file with the following fields:
+  - `name` (string): Display name for the command
+  - `cmd` (string|function|table): The command(s) to execute
+  - `env` (table, optional): Key-value pairs of environment variables
 - **Command**: the command or one of the commands that will be run
 - **Chain**: a series of commands to be run in sequence
 
@@ -179,16 +182,16 @@ return {
 
 Each command in a chain can have these options:
 
-- `cmd`: The command to run (string or function)
-- `when`: Function that returns true if command should run
-- `continue_on_error`: Continue chain even if this command fails
-- `always_run`: Run this command even if previous commands failed
-- `wait_for`: Function that returns true when ready to proceed
-- `timeout`: Seconds to wait for wait_for condition (default: 30)
+- `cmd` (string|function): The command to run
+- `when` (function, optional): Function that returns boolean indicating if command should run
+- `continue_on_error` (boolean, optional): Continue chain even if this command fails
+- `always_run` (boolean, optional): Run this command even if previous commands failed
+- `wait_for` (function, optional): Function that returns boolean when ready to proceed
+- `timeout` (number, optional): Seconds to wait for wait_for condition (default: 30)
 
 Chain-level options:
-- `on_success`: Function called if all commands succeed
-- `on_error`: Function called when a command fails
+- `on_success` (function, optional): Function called if all commands succeed
+- `on_error` (function, optional): Function called when a command fails with the failed command string as parameter
 
 ### Environment Variables
 
