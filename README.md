@@ -4,11 +4,9 @@ A Neovim plugin for running scripts and commands with smart context awareness an
 
 ## Features
 
-- Run commands based on filetype or project configuration
+- Run commands based on filetype or project-specific configuration
 - Command chaining with error handling
 - Environment variable support
-- Conditional command execution
-- Wait conditions for dependent commands
 
 ## Installation
 
@@ -23,89 +21,126 @@ Using `lazy.nvim`:
 }
 ```
 
+## Configuration
+
+The following can be passed into opts:
+
+- `keys`: Customize key mappings
+  - `run`: Key for smart run command (default: `<leader>rr`)
+  - `run_proj`: Key for opening project script menu (default: `<leader>rt`)
+- `filetype`: Filetype-specific default commands
+
+This is an example configuration:
+
+```lua
+opts = {
+    filetype = {
+        scala = function ()
+            vim.notify("Execute 'sbt run' in a separate tmux window!")
+        end,
+        python = function()
+            if vim.fn.findfile("pyproject.toml", ".;") ~= "" then
+                return "poetry run python3 %f"
+            else
+                return "python3 %f"
+            end
+        end,
+        rust = "cargo run",
+        lua = "lua %f",
+        markdown = ":MarkdownPreview",
+        java = function()
+            if vim.fn.findfile("build.gradle", ".;") ~= "" then
+                return "./gradlew run"
+            else
+                return "java %f"
+            end
+        end,
+        r = "rscript %f",
+    },
+},
+```
+
 ## Usage
 
 ### Key Bindings
 
-- `<leader>rr`: Smart run command
+- run (default: `<leader>rr`): Smart run command
   - Without project config: Runs filetype-specific default command
   - With project config: Runs project default or shows script menu
-- `<leader>rt`: Open project script menu (if project config exists)
+- run_proj (default: `<leader>rt`): Open project script menu (if project config exists)
 
 ### Commands
 
-- `:Run`: Same as `<leader>rr`
+- `:Run`: Same as run keybind
 - `:RunSetDefault`: Set a default script for the current project
 - `:RunReloadProj`: Reload the project configuration file
 
 ## Project Configuration
 
-The plugin uses a `run.nvim.lua` file for project-specific configurations. Here are some examples:
-
-### Basic Commands
+The plugin uses a `run.nvim.lua` file for project-specific configurations. It should be a simple file that returns a lua table. Here is the basic structure:
 
 ```lua
 return {
-    -- Simple command
-    test = {
-        name = "Run Tests",
-        cmd = "npm test"
+    commandA = {
+        name = "Command A",
+        cmd = "make run"
     },
-
-    -- Command with current file
-    compile = {
-        name = "Compile File",
-        cmd = "gcc %f -o out"  -- %f is replaced with current file path
+    commandB = {
+        name = "Command B",
+        cmd = ":PeekOpen"
+    },
+    commandC = {
+        name = "Command C",
+        cmd = function ()
+            return "python3 %f"
+        end
     }
 }
 ```
 
-### Environment Variables
+Moving forward, this is the terminology to be used:
+- **Run Configuration**: an entry in the `run.nvim.lua` file
+- **Command**: the command or one of the commands that will be run
+- **Chain**: a series of commands to be run in sequence
 
-Environment variables are specified at the chain level and apply to all commands in the chain:
+### Basic Command Types and Auto Replacements
 
-```lua
-return {
-    test = {
-        name = "Run Tests",
-        -- Environment variables for all commands
-        env = {
-            NODE_ENV = "test",
-            DEBUG = "1",
-            TEST_DB = "/path/to/test.db"
-        },
-        cmd = {
-            "npm run lint",    -- Will run with above env
-            "npm test",        -- Same env
-            "npm run e2e"      -- Same env
-        }
-    },
+Commands can be specified in three ways:
 
-    deploy = {
-        name = "Deploy",
-        env = {
-            NODE_ENV = "production",
-            DEPLOY_TARGET = "prod"
-        },
-        cmd = {
-            "npm run build",
-            "npm run deploy"
-        }
-    }
-}
-```
+1. **Shell Commands** (run in terminal):
+   ```lua
+   cmd = "npm test"
+   ```
+
+2. **Vim Commands** (prefixed with `:`):
+   ```lua
+   cmd = ":Telescope find_files"
+   ```
+
+3. **Lua Functions** (return nil or one of the above as a string):
+   ```lua
+   cmd = function()
+     if vim.fn.filereadable("Cargo.toml") then
+       return "cargo test"
+     end
+     return nil  -- Do nothing
+   end
+   ```
+
+There can also be patterns that are replaced by things:
+
+1. **File Path**: `%f` will be replaced with the current file path.
+
+So far, this is the only replacement.
 
 ### Command Chaining
 
-Commands can be chained using an array:
+Commands can be chained using an array in the `cmd` field:
 
 ```lua
 return {
     build_and_test = {
         name = "Build and Test",
-        env = {
-            NODE_ENV = "test"
-        },
         cmd = {
             -- Basic command chain
             "npm run build",
@@ -152,30 +187,40 @@ Each command in a chain can have these options:
 - `timeout`: Seconds to wait for wait_for condition (default: 30)
 
 Chain-level options:
-- `env`: Environment variables table for all commands
 - `on_success`: Function called if all commands succeed
 - `on_error`: Function called when a command fails
 
-## Command Types
+### Environment Variables
 
-Commands can be specified in three ways:
+Environment variables are specified at the run configuration level and apply to the entire configuration's environment(all commands in a chain execute in this environment):
 
-1. **Shell Commands** (run in terminal):
-   ```lua
-   cmd = "npm test"
-   ```
+```lua
+return {
+    test = {
+        name = "Run Tests",
+        -- Environment variables for all commands
+        env = {
+            NODE_ENV = "test",
+            DEBUG = "1",
+            TEST_DB = "/path/to/test.db"
+        },
+        cmd = {
+            "npm run lint",    -- Will run with above env
+            "npm test",        -- Same env
+            "npm run e2e"      -- Same env
+        }
+    },
 
-2. **Vim Commands** (prefixed with `:`):
-   ```lua
-   cmd = ":Telescope find_files"
-   ```
-
-3. **Lua Functions** (return command or nil):
-   ```lua
-   cmd = function()
-     if vim.fn.filereadable("Cargo.toml") then
-       return "cargo test"
-     end
-     return nil  -- Do nothing
-   end
-   ```
+    deploy = {
+        name = "Deploy",
+        env = {
+            NODE_ENV = "production",
+            DEPLOY_TARGET = "prod"
+        },
+        cmd = {
+            "npm run build",
+            "npm run deploy"
+        }
+    }
+}
+```
