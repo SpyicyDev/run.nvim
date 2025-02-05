@@ -125,10 +125,30 @@ return {
 
 3. **Lua Functions**
    ```lua
+   -- Return a shell command
    cmd = function()
        return "echo " .. vim.fn.expand("%")
    end
+
+   -- Return a Vim command
+   cmd = function()
+       return ":luafile " .. vim.fn.expand("%")
+   end
+
+   -- Return nil to skip execution
+   cmd = function()
+       if vim.fn.filereadable("package.json") == 1 then
+           return "npm test"
+       end
+       return nil  -- Skip if no package.json
+   end
    ```
+
+   Functions can:
+   - Return a shell command string
+   - Return a Vim command string (prefixed with `:`)
+   - Return `nil` to skip execution
+   - Throw an error to stop the command chain (unless `continue_on_error` is true)
 
 ### Command Chains
 

@@ -152,6 +152,20 @@ M.run_file = function()
             config.proj["_temp_filetype"] = { cmd = exec }
             utils.run_cmd("_temp_filetype")
             config.proj["_temp_filetype"] = nil
+        elseif type(exec) == "table" then
+            -- Handle table configuration with cmd and env
+            if not exec.cmd then
+                vim.notify("Invalid filetype configuration: missing cmd field", vim.log.levels.ERROR, {
+                    title = "run.nvim"
+                })
+                return
+            end
+            config.proj["_temp_filetype"] = {
+                cmd = exec.cmd,
+                env = exec.env
+            }
+            utils.run_cmd("_temp_filetype")
+            config.proj["_temp_filetype"] = nil
         else
             utils.run_cmd(exec)
         end
