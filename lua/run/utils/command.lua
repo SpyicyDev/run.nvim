@@ -3,7 +3,21 @@ local M = {}
 -- Import required modules
 local notify = require("run.utils.notify").notify
 local env = require("run.utils.env")
-local validation = require("run.utils.validation")
+
+---Validate command input
+---@param cmd any The command to validate
+---@return boolean is_valid Whether the command is valid
+local function validate_cmd(cmd)
+    if not cmd then
+        notify("Command is nil", vim.log.levels.ERROR)
+        return false
+    end
+    if type(cmd) ~= "string" then
+        notify("Command must be a string", vim.log.levels.ERROR)
+        return false
+    end
+    return true
+end
 
 ---Validates a command object in a command chain
 ---@param cmd table|string The command object or string to validate
@@ -30,7 +44,7 @@ end
 ---@param cmd string The command to process
 ---@return string|nil processed_cmd The processed command or nil if invalid
 local function preprocess_cmd(cmd)
-    if not validation.validate_cmd(cmd) then 
+    if not validate_cmd(cmd) then 
         return nil 
     end
 
