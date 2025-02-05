@@ -4,8 +4,8 @@ local M = {}
 local command = require("run.utils.command")
 local notify = require("run.utils.notify")
 local validation = require("run.utils.validation")
-local path = require("run.utils.path")
 local env = require("run.utils.env")
+local path = require("run.utils.path")
 
 -- Re-export command utilities
 M.run_cmd = command.run_cmd

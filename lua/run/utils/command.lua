@@ -30,7 +30,9 @@ end
 ---@param cmd string The command to process
 ---@return string|nil processed_cmd The processed command or nil if invalid
 local function preprocess_cmd(cmd)
-    if not validation.validate_cmd(cmd) then return nil end
+    if not validation.validate_cmd(cmd) then 
+        return nil 
+    end
 
     if string.find(cmd, "%%f") then
         local buf_name = vim.api.nvim_buf_get_name(0)
@@ -38,7 +40,8 @@ local function preprocess_cmd(cmd)
             notify("No buffer name available for %f substitution", vim.log.levels.ERROR)
             return nil
         end
-        return string.gsub(cmd, "%%f", buf_name)
+        local processed = string.gsub(cmd, "%%f", buf_name)
+        return processed
     end
     return cmd
 end
