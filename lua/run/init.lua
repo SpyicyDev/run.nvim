@@ -63,15 +63,18 @@ M.setup = function(opts)
     })
 end
 
--- look for run.nvim.lua, if there load it into config.proj
+-- Simplified project configuration loading
 M.setup_proj = function()
     local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
-    if proj_file ~= "" then
-        config.proj = dofile(proj_file)
-
-        config.proj_file_exists = true
-    else
-        config.proj_file_exists = false
+    config.proj_file_exists = proj_file ~= ""
+    if config.proj_file_exists then
+        local ok, result = pcall(dofile, proj_file)
+        if ok then
+            config.proj = result
+        else
+            vim.notify("Error loading project configuration: " .. tostring(result), vim.log.levels.ERROR)
+            config.proj = {}
+        end
     end
 end
 
@@ -85,17 +88,24 @@ M.reload_proj = function()
     })
 end
 
--- main run method, delegates to either run_file, run_proj, or run_proj_default
+-- Unified command execution
+local execute_command = function(cmd_type, options)
+    if cmd_type == "file" then
+        return M.run_file()
+    elseif cmd_type == "proj" then
+        return M.run_proj()
+    elseif cmd_type == "proj_default" then
+        return M.run_proj_default()
+    end
+end
+
+-- Main run method
 M.run = function()
     if not config.proj_file_exists then
-        M.run_file()
-    else
-        if config.proj and config.proj.default ~= nil then
-            M.run_proj_default()
-        else
-            M.run_proj()
-        end
+        return execute_command("file")
     end
+    
+    return execute_command(config.proj.default and "proj_default" or "proj")
 end
 
 -- run the default script for the filetype

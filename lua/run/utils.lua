@@ -3,49 +3,69 @@ local M = {}
 local config = require("run.config")
 local env = require("run.env")
 
--- do any preprocessing to the cmd string
-M.fmt_cmd = function(cmd)
-    if not cmd then
-        vim.notify("Command string is nil", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
-        return nil
-    end
+-- Common notification wrapper
+local notify = function(msg, level)
+    vim.notify(msg, level or vim.log.levels.INFO, { title = "run.nvim" })
+end
 
-    if type(cmd) ~= "string" then
-        vim.notify("Command must be a string", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
-        return nil
+-- Validate command input
+local validate_cmd = function(cmd)
+    if not cmd then
+        notify("Command is nil", vim.log.levels.ERROR)
+        return false
     end
+    if type(cmd) ~= "string" then
+        notify("Command must be a string", vim.log.levels.ERROR)
+        return false
+    end
+    return true
+end
+
+-- Process file path substitutions
+M.fmt_cmd = function(cmd)
+    if not validate_cmd(cmd) then return nil end
 
     if string.find(cmd, "%%f") then
         local buf_name = vim.api.nvim_buf_get_name(0)
         if not buf_name or buf_name == "" then
-            vim.notify("No buffer name available for %f substitution", vim.log.levels.ERROR, {
-                title = "run.nvim"
-            })
+            notify("No buffer name available for %f substitution", vim.log.levels.ERROR)
             return nil
         end
-        cmd = string.gsub(cmd, "%%f", buf_name)
+        return string.gsub(cmd, "%%f", buf_name)
     end
-
     return cmd
 end
 
--- run a cmd, either in term, vim command, or a lua function that optionally returns one of those
+-- Execute a single command
+local execute_single_cmd = function(cmd, env_vars)
+    if cmd:sub(1, 1) == ":" then
+        local success, err = pcall(vim.cmd, cmd:sub(2))
+        if not success then
+            notify("Error executing vim command: " .. tostring(err), vim.log.levels.ERROR)
+            return false
+        end
+        return true
+    end
+
+    local term = require("FTerm")
+    if not term then
+        notify("FTerm not found. Make sure it's installed", vim.log.levels.ERROR)
+        return false
+    end
+    
+    term.scratch({ cmd = cmd, env = env_vars })
+    return true
+end
+
+-- Process command section and execute
 M.run_cmd = function(cmd_section)
     if not cmd_section then
-        vim.notify("Command section is nil", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
+        notify("Command section is nil", vim.log.levels.ERROR)
         return false
     end
 
     if not config.proj or not config.proj[cmd_section] then
-        vim.notify("Command section not found in project configuration", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
+        notify("Command section not found in project configuration", vim.log.levels.ERROR)
         return false
     end
 
@@ -57,63 +77,25 @@ M.run_cmd = function(cmd_section)
         return M.run_command_chain(cmd, cmd_section)
     end
 
-    -- Handle function that returns a command
+    -- Handle function commands
     if type(cmd) == "function" then
         local success, result = pcall(cmd)
         if not success then
-            vim.notify("Error executing command function: " .. tostring(result), vim.log.levels.ERROR, {
-                title = "run.nvim"
-            })
+            notify("Error executing command function: " .. tostring(result), vim.log.levels.ERROR)
             return false
         end
         cmd = result
-        if cmd == nil then
-            return true
-        end
+        if cmd == nil then return true end
     end
 
     cmd = M.fmt_cmd(cmd)
-    if not cmd then
-        return false
-    end
+    if not cmd or not validate_cmd(cmd) then return false end
 
-    if type(cmd) ~= "string" then
-        vim.notify("Command must be a string", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
-        return false
-    end
-
-    if cmd:sub(1, 1) == ":" then
-        local success, err = pcall(vim.cmd, cmd:sub(2))
-        if not success then
-            vim.notify("Error executing vim command: " .. tostring(err), vim.log.levels.ERROR, {
-                title = "run.nvim"
-            })
-            return false
-        end
-        return true
-    end
-
-    local term = require("FTerm")
-    if not term then
-        vim.notify("FTerm not found. Make sure it's installed", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
-        return false
-    end
-    
-    -- Process environment variables from the command section
     local processed_env = env.process_env(cmd_config.env)
-    
-    term.scratch({ 
-        cmd = cmd,
-        env = processed_env
-    })
-    return true
+    return execute_single_cmd(cmd, processed_env)
 end
 
--- Handle a chain of commands
+-- Improved command chain execution
 M.run_command_chain = function(commands, cmd_section)
     local callbacks = {}
     local shell_commands = {}
@@ -152,9 +134,7 @@ M.run_command_chain = function(commands, cmd_section)
             end
             
             if vim.loop.now() - start_time >= timeout then
-                vim.notify("Timeout waiting for condition", vim.log.levels.ERROR, {
-                    title = "run.nvim"
-                })
+                notify("Timeout waiting for condition", vim.log.levels.ERROR)
                 return false
             end
         end
@@ -219,9 +199,7 @@ M.run_command_chain = function(commands, cmd_section)
     if #shell_commands > 0 then
         local term = require("FTerm")
         if not term then
-            vim.notify("FTerm not found. Make sure it's installed", vim.log.levels.ERROR, {
-                title = "run.nvim"
-            })
+            notify("FTerm not found. Make sure it's installed", vim.log.levels.ERROR)
             return false
         end
 
@@ -246,33 +224,25 @@ end
 function M.write_conf()
     local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     if not proj_file or proj_file == "" then
-        vim.notify("Could not find run.nvim.lua file", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
+        notify("Could not find run.nvim.lua file", vim.log.levels.ERROR)
         return
     end
 
     local file = io.open(proj_file, "w")
     if not file then
-        vim.notify("Could not open run.nvim.lua for writing", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
+        notify("Could not open run.nvim.lua for writing", vim.log.levels.ERROR)
         return
     end
 
     if not config.proj then
-        vim.notify("Project configuration is nil", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
+        notify("Project configuration is nil", vim.log.levels.ERROR)
         file:close()
         return
     end
 
     local inspect = require("inspect")
     if not inspect then
-        vim.notify("Could not load inspect module", vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
+        notify("Could not load inspect module", vim.log.levels.ERROR)
         file:close()
         return
     end
@@ -286,9 +256,7 @@ function M.write_conf()
     end)
 
     if not success then
-        vim.notify("Error writing configuration: " .. tostring(err), vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
+        notify("Error writing configuration: " .. tostring(err), vim.log.levels.ERROR)
     end
 end
 
