@@ -20,8 +20,20 @@ local function preprocess_cmd(cmd)
     return cmd
 end
 
--- Execute a command with environment variables
-local function execute_cmd(cmd, env_vars)
+-- Execute a Vim command in the current instance
+local function execute_vim_cmd(cmd)
+    -- Remove the leading ":"
+    local vim_cmd = cmd:sub(2)
+    local success, err = pcall(vim.cmd, vim_cmd)
+    if not success then
+        notify("Error executing vim command: " .. tostring(err), vim.log.levels.ERROR)
+        return false
+    end
+    return true
+end
+
+-- Execute a shell command with environment variables
+local function execute_shell_cmd(cmd, env_vars)
     local term = require("FTerm")
     if not term then
         notify("FTerm not found. Make sure it's installed", vim.log.levels.ERROR)
@@ -40,20 +52,17 @@ local function execute_cmd(cmd, env_vars)
     return true
 end
 
--- Build a shell command with error handling
-local function build_shell_command(cmd, continue_on_error)
-    if type(cmd) ~= "string" then return nil end
+-- Execute a single command of any type
+local function execute_single_cmd(cmd, env_vars)
+    if type(cmd) ~= "string" then return false end
     
     -- Handle Vim commands
     if cmd:sub(1, 1) == ":" then
-        local vim_cmd = cmd:sub(2) -- Remove the leading ":"
-        -- Convert vim command to shell command using nvim --headless
-        return string.format("nvim --headless -c '%s' -c 'q'", vim_cmd)
+        return execute_vim_cmd(cmd)
     end
     
     -- Handle shell commands
-    local error_check = continue_on_error and "|| true" or ""
-    return cmd .. " " .. error_check
+    return execute_shell_cmd(cmd, env_vars)
 end
 
 -- Format command with preprocessing
@@ -63,7 +72,7 @@ end
 
 -- Execute a single command
 M.execute_single_cmd = function(cmd, env_vars)
-    return execute_cmd(cmd, env_vars)
+    return execute_single_cmd(cmd, env_vars)
 end
 
 -- Process command section and execute
@@ -137,7 +146,8 @@ M.run_command_chain = function(commands, cmd_section)
     end
 
     -- Process each command
-    local command_parts = {}
+    local vim_commands = {}
+    local shell_commands = {}
     local success = true
 
     for _, cmd in ipairs(commands) do
@@ -164,32 +174,70 @@ M.run_command_chain = function(commands, cmd_section)
         current_cmd = M.fmt_cmd(current_cmd)
         if not current_cmd then goto continue end
 
-        -- Build shell command with error handling
-        local shell_cmd = build_shell_command(current_cmd, type(cmd) == "table" and cmd.continue_on_error)
-        if not shell_cmd then goto continue end
-
-        -- Add command to chain based on always_run flag
-        if type(cmd) == "table" and cmd.always_run then
-            -- Commands that should always run are added with true || command
-            table.insert(command_parts, "{ " .. shell_cmd .. "; }")
+        -- Separate Vim and shell commands
+        if current_cmd:sub(1, 1) == ":" then
+            table.insert(vim_commands, {
+                cmd = current_cmd,
+                continue_on_error = type(cmd) == "table" and cmd.continue_on_error,
+                always_run = type(cmd) == "table" and cmd.always_run
+            })
         else
-            table.insert(command_parts, shell_cmd)
+            table.insert(shell_commands, {
+                cmd = current_cmd,
+                continue_on_error = type(cmd) == "table" and cmd.continue_on_error,
+                always_run = type(cmd) == "table" and cmd.always_run
+            })
         end
 
         ::continue::
     end
 
-    -- If we have commands to run, execute them in a single FTerm instance
-    if #command_parts > 0 then
+    -- Execute Vim commands first in the current instance
+    for _, cmd_info in ipairs(vim_commands) do
+        if not success and not cmd_info.always_run then
+            goto continue
+        end
+
+        local cmd_success = execute_vim_cmd(cmd_info.cmd)
+        if not cmd_success and not cmd_info.continue_on_error then
+            success = false
+        end
+
+        ::continue::
+    end
+
+    -- Then execute shell commands in a single FTerm instance
+    if success and #shell_commands > 0 then
         -- Join commands with && to ensure proper execution order
         -- Add echo statements to show command execution
-        local combined_cmd = table.concat(
-            vim.tbl_map(function(cmd)
-                return string.format('echo "\\033[1;34m==> Running: %s\\033[0m" && %s', cmd:gsub('"', '\\"'), cmd)
-            end, command_parts),
-            " && "
-        )
-        success = execute_cmd(combined_cmd, processed_env)
+        local command_parts = {}
+        for _, cmd_info in ipairs(shell_commands) do
+            if not success and not cmd_info.always_run then
+                goto continue
+            end
+
+            -- Add command with proper error handling
+            if cmd_info.always_run then
+                table.insert(command_parts, "{ " .. cmd_info.cmd .. "; }")
+            else
+                local error_check = cmd_info.continue_on_error and "|| true" or ""
+                table.insert(command_parts, cmd_info.cmd .. " " .. error_check)
+            end
+
+            ::continue::
+        end
+
+        if #command_parts > 0 then
+            -- Add command execution feedback
+            local combined_cmd = table.concat(
+                vim.tbl_map(function(cmd)
+                    return string.format('echo "\\033[1;34m==> Running: %s\\033[0m" && %s', 
+                        cmd:gsub('"', '\\"'), cmd)
+                end, command_parts),
+                " && "
+            )
+            success = execute_shell_cmd(combined_cmd, processed_env)
+        end
     end
 
     -- Handle callbacks
