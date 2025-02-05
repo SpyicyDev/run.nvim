@@ -73,6 +73,34 @@ use {
 
 ## ⚙️ Configuration
 
+### Configuration Reference
+
+#### Global Configuration Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `keys.run` | `string` | `"<leader>rr"` | Keybinding to run the default command |
+| `keys.run_proj` | `string` | `"<leader>rt"` | Keybinding to show project command menu |
+| `filetype` | `table` | `{}` | Table of filetype-specific commands |
+
+#### Project Command Options
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | Yes | Display name for the command |
+| `cmd` | `string\|function\|table` | Yes | Command to execute (can be string, function, or command chain) |
+| `env` | `table` | No | Environment variables for this command |
+| `continue_on_error` | `boolean` | No | Whether to continue chain if this command fails |
+| `when` | `function` | No | Function that determines if command should run |
+| `always_run` | `boolean` | No | Whether to run command even if previous commands failed |
+
+#### Environment Variable Options
+
+| Field | Type | Example | Description |
+|-------|------|---------|-------------|
+| `string` | `string` | `"production"` | Static environment variable value |
+| `function` | `function` | `function() return vim.fn.getcwd() end` | Dynamic environment variable value |
+
 ### Global Plugin Configuration
 
 Configure default behavior in your Neovim config:
