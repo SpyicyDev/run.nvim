@@ -207,6 +207,16 @@ return {
             DEBUG = "1"
         },
         cmd = "npm test"
+    },
+    deploy = {
+        name = "Deploy",
+        env = {
+            NODE_ENV = "production"
+        },
+        cmd = {
+            "npm run build",
+            "npm run deploy"
+        }
     }
 }
 ```
@@ -243,7 +253,6 @@ return {
                 when = function()
                     return vim.fn.getcwd():match("production")
                 end,
-                default = "development"
             },
             DEBUG = {
                 value = "1",
@@ -257,30 +266,4 @@ return {
 }
 ```
 
-Environment variables are processed before command execution. For dynamic variables, the functions are called just before the command runs, ensuring up-to-date values. Conditional variables are evaluated based on their `when` function, falling back to their `default` value (if specified) when the condition is not met.
-```lua
-return {
-    test = {
-        name = "Run Tests",
-        -- Environment variables for all commands
-        env = {
-            NODE_ENV = "test",
-            DEBUG = "1",
-            TEST_DB = "/path/to/test.db"
-        },
-        cmd = {
-            "npm run lint",    -- Will run with above env
-            "npm test",        -- Same env
-            "npm run e2e"      -- Same env
-        }
-    },
-
-    deploy = {
-        name = "Deploy",
-        env = {
-            NODE_ENV = "production",
-            DEPLOY_TARGET = "prod"
-        },
-        cmd = "npm run build"
-    }
-}
+Environment variables are processed before command execution. For dynamic variables, the functions are called just before the command runs, ensuring up-to-date values. Conditional variables are evaluated based on their `when` function, and are not set if the function does not return `true`.
