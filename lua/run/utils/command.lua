@@ -31,21 +31,13 @@ local function execute_cmd(cmd, env_vars)
     -- Merge environment variables with system environment
     local merged_env = env.merge_with_system_env(env_vars)
     
+    -- Execute in a single terminal instance
     term.scratch({ 
         cmd = cmd,
-        env = merged_env
+        env = merged_env,
+        auto_close = false -- Keep terminal open for visibility
     })
     return true
-end
-
--- Format command with preprocessing
-M.fmt_cmd = function(cmd)
-    return preprocess_cmd(cmd)
-end
-
--- Execute a single command
-M.execute_single_cmd = function(cmd, env_vars)
-    return execute_cmd(cmd, env_vars)
 end
 
 -- Build a shell command with error handling
@@ -62,6 +54,16 @@ local function build_shell_command(cmd, continue_on_error)
     -- Handle shell commands
     local error_check = continue_on_error and "|| true" or ""
     return cmd .. " " .. error_check
+end
+
+-- Format command with preprocessing
+M.fmt_cmd = function(cmd)
+    return preprocess_cmd(cmd)
+end
+
+-- Execute a single command
+M.execute_single_cmd = function(cmd, env_vars)
+    return execute_cmd(cmd, env_vars)
 end
 
 -- Process command section and execute
@@ -144,18 +146,6 @@ M.run_command_chain = function(commands, cmd_section)
             goto continue
         end
 
-        -- Handle wait conditions
-        if type(cmd) == "table" and cmd.wait_for then
-            local start_time = vim.loop.now()
-            while not cmd.wait_for() do
-                if vim.loop.now() - start_time > 5000 then
-                    notify("Timeout waiting for condition", vim.log.levels.ERROR)
-                    return false
-                end
-                vim.loop.sleep(100)
-            end
-        end
-
         -- Process the command
         local current_cmd = type(cmd) == "table" and cmd.cmd or cmd
         if type(current_cmd) == "function" then
@@ -181,7 +171,7 @@ M.run_command_chain = function(commands, cmd_section)
         -- Add command to chain based on always_run flag
         if type(cmd) == "table" and cmd.always_run then
             -- Commands that should always run are added with true || command
-            table.insert(command_parts, "true || " .. shell_cmd)
+            table.insert(command_parts, "{ " .. shell_cmd .. "; }")
         else
             table.insert(command_parts, shell_cmd)
         end
@@ -192,7 +182,13 @@ M.run_command_chain = function(commands, cmd_section)
     -- If we have commands to run, execute them in a single FTerm instance
     if #command_parts > 0 then
         -- Join commands with && to ensure proper execution order
-        local combined_cmd = table.concat(command_parts, " && ")
+        -- Add echo statements to show command execution
+        local combined_cmd = table.concat(
+            vim.tbl_map(function(cmd)
+                return string.format('echo "\\033[1;34m==> Running: %s\\033[0m" && %s', cmd:gsub('"', '\\"'), cmd)
+            end, command_parts),
+            " && "
+        )
         success = execute_cmd(combined_cmd, processed_env)
     end
 

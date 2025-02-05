@@ -1,269 +1,200 @@
 # run.nvim
 
-A Neovim plugin for running scripts and commands with smart context awareness and project-specific configurations.
+A powerful and flexible command execution plugin for Neovim that makes running project commands a breeze.
 
 ## Features
 
-- Run commands based on filetype or project-specific configuration
-- Command chaining with error handling
-- Environment variable support
+- 🚀 **Multiple Command Types**
+  - Shell commands
+  - Vim commands (starting with ":")
+  - Dynamic Lua functions
+  
+- 🔗 **Command Chaining**
+  - Run multiple commands in sequence
+  - All commands execute in a single terminal instance
+  - Colorful execution feedback
+  - Error handling with continue_on_error
+  - Conditional execution with when functions
+
+- 🌍 **Environment Variables**
+  - Project-specific environment variables
+  - Dynamic environment variables using functions
+  - Automatic merging with system environment
+
+- 🎯 **Smart Command Processing**
+  - File path substitution (%f)
+  - Command validation
+  - Error handling and reporting
+  - Colorful command execution feedback
 
 ## Installation
 
-Using `lazy.nvim`:
+Using [lazy.nvim](https://github.com/folke/lazy.nvim):
+
 ```lua
 {
-  "SpyicyDev/run.nvim",
-  dependencies = {
-    "numToStr/FTerm.nvim",
-  },
-  opts = {},
+    "SpyicyDev/run.nvim",
+    dependencies = {
+        "numToStr/FTerm.nvim",  -- Required for terminal execution
+    },
+    config = function()
+        require("run").setup()
+    end
 }
 ```
 
 ## Configuration
 
-The following can be passed into opts:
-
-- `keys` (table): Customize key mappings
-  - `run` (string): Key for smart run command (default: `<leader>rr`)
-  - `run_proj` (string): Key for opening project script menu (default: `<leader>rt`)
-- `filetype` (table): Filetype-specific default commands mapping filetype strings to either string commands or functions that return string commands
-
-This is an example configuration using the default keybinds:
-
 ```lua
-opts = {
-    filetype = {
-        scala = function ()
-            vim.notify("Execute 'sbt run' in a separate tmux window!")
-        end,
-        python = function()
-            if vim.fn.findfile("pyproject.toml", ".;") ~= "" then
-                return "poetry run python3 %f"
-            else
-                return "python3 %f"
-            end
-        end,
-        rust = "cargo run",
-        lua = "lua %f",
-        markdown = ":MarkdownPreview",
-        java = function()
-            if vim.fn.findfile("build.gradle", ".;") ~= "" then
-                return "./gradlew run"
-            else
-                return "java %f"
-            end
-        end,
-        r = "rscript %f",
-    },
-},
+require("run").setup({
+    -- Your configuration options here
+})
 ```
 
 ## Usage
 
-### Key Bindings
-
-- run (default: `<leader>rr`): Smart run command
-  - Without project config: Runs filetype-specific default command
-  - With project config: Runs project default or shows script menu
-- run_proj (default: `<leader>rt`): Open project script menu (if project config exists)
-
-### Commands
-
-- `:Run`: Same as run keybind
-- `:RunSetDefault`: Set a default script for the current project
-- `:RunReloadProj`: Reload the project configuration file
-
-## Project Configuration
-
-The plugin uses a `run.nvim.lua` file for project-specific configurations. It should be a simple file that returns a lua table. Here is the basic structure:
+### Basic Commands
 
 ```lua
-return {
-    commandA = {
-        name = "Command A",
-        cmd = "make run"
+-- Define commands in your project configuration
+local config = {
+    build = {
+        cmd = "make",              -- Simple shell command
+        env = {                    -- Project environment variables
+            BUILD_ENV = "debug"
+        }
     },
-    commandB = {
-        name = "Command B",
-        cmd = ":PeekOpen"
-    },
-    commandC = {
-        name = "Command C",
-        cmd = function ()
-            return "python3 %f"
+    test = {
+        cmd = ":write | make test" -- Vim command followed by shell command
+    }
+}
+```
+
+### Command Chains
+
+```lua
+-- Chain multiple commands with error handling
+local config = {
+    build_and_test = {
+        cmd = {
+            ":write",                                -- Save current buffer
+            { cmd = "make", continue_on_error = true }, -- Continue even if make fails
+            {
+                cmd = "npm test",
+                when = function() return vim.v.shell_error == 0 end -- Only run if make succeeded
+            },
+            { cmd = "echo 'Done'", always_run = true }  -- Always runs at the end
+        }
+    }
+}
+```
+
+### Dynamic Commands
+
+```lua
+-- Use functions for dynamic commands
+local config = {
+    run_file = {
+        cmd = function()
+            local file = vim.fn.expand("%:p")
+            if vim.fn.executable(file) then
+                return "./" .. file
+            end
+            return nil  -- Skip execution if file is not executable
         end
     }
 }
 ```
 
-Moving forward, this is the terminology and field types to be used:
-- **Run Configuration**: an entry in the `run.nvim.lua` file with the following fields:
-  - `name` (string): Display name for the command
-  - `cmd` (string|function|table): The command(s) to execute
-  - `env` (table, optional): Key-value pairs of environment variables
-- **Command**: the command or one of the commands that will be run
-- **Chain**: a series of commands to be run in sequence
-
-### Basic Command Types and Auto Replacements
-
-Commands can be specified in three ways:
-
-1. **Shell Commands** (run in terminal):
-   ```lua
-   cmd = "npm test"
-   ```
-
-2. **Vim Commands** (prefixed with `:`):
-   ```lua
-   cmd = ":Telescope find_files"
-   ```
-
-3. **Lua Functions** (return nil or one of the above as a string):
-   ```lua
-   cmd = function()
-     if vim.fn.filereadable("Cargo.toml") then
-       return "cargo test"
-     end
-     return nil  -- Do nothing
-   end
-   ```
-
-There can also be patterns that are replaced by things:
-
-1. **File Path**: `%f` will be replaced with the current file path.
-
-So far, this is the only replacement.
-
-### Command Chaining
-
-Commands can be chained using an array in the `cmd` field:
+### Environment Variables
 
 ```lua
-return {
-    build_and_test = {
-        name = "Build and Test",
-        cmd = {
-            -- Basic command chain
-            "npm run build",
-            "npm test",
-            
-            -- Command with condition
-            {
-                cmd = "npm run e2e",
-                when = function()
-                    return vim.fn.filereadable("e2e.config.js") == 1
-                end
-            },
-            
-            -- Command with wait condition
-            {
-                cmd = "docker-compose up -d db",
-                wait_for = function()
-                    return vim.fn.system("docker-compose ps db | grep healthy")
-                end,
-                timeout = 30  -- seconds
-            },
-            
-            -- Callbacks for the chain
-            on_success = function()
-                vim.notify("All commands completed!", vim.log.levels.INFO)
+-- Dynamic environment variables
+local config = {
+    build = {
+        cmd = "make",
+        env = {
+            PATH = function()
+                return vim.fn.expand("$PATH") .. ":/usr/local/bin"
             end,
-            on_error = function(failed_cmd)
-                vim.notify("Failed at: " .. failed_cmd, vim.log.levels.ERROR)
-            end
+            BUILD_DIR = "${PWD}/build",
+            DEBUG = "1"
         }
     }
 }
 ```
 
-### Command Options
+## Commands
 
-Each command in a chain can have these options:
+- `:RunProject` - Run the default project command
+- `:RunCommand {cmd}` - Run a specific command from your configuration
+- `:RunSetDefault {cmd}` - Set the default command for the project
 
-- `cmd` (string|function): The command to run
-- `when` (function, optional): Function that returns boolean indicating if command should run
-- `continue_on_error` (boolean, optional): Continue chain even if this command fails
-- `always_run` (boolean, optional): Run this command even if previous commands failed
-- `wait_for` (function, optional): Function that returns boolean when ready to proceed
-- `timeout` (number, optional): Seconds to wait for wait_for condition (default: 30)
+## Features in Detail
 
-Chain-level options:
-- `on_success` (function, optional): Function called if all commands succeed
-- `on_error` (function, optional): Function called when a command fails with the failed command string as parameter
+### Command Types
+
+1. **Shell Commands**
+   - Regular shell commands (e.g., "make", "npm test")
+   - Executed in a persistent terminal window
+   - Environment variables are properly merged
+
+2. **Vim Commands**
+   - Start with ":" (e.g., ":write", ":make")
+   - Automatically converted to shell commands for chain execution
+   - Can be mixed with other command types
+
+3. **Function Commands**
+   - Lua functions that return commands
+   - Can return nil to skip execution
+   - Full access to Neovim API
+
+### Command Chain Options
+
+1. **continue_on_error**
+   ```lua
+   { cmd = "risky-command", continue_on_error = true }
+   ```
+   - Chain continues even if this command fails
+
+2. **always_run**
+   ```lua
+   { cmd = "cleanup", always_run = true }
+   ```
+   - Command runs regardless of previous failures
+
+3. **when**
+   ```lua
+   {
+       cmd = "npm test",
+       when = function() return vim.v.shell_error == 0 end
+   }
+   ```
+   - Conditional execution based on a function
 
 ### Environment Variables
 
-Environment variables can be specified at the run configuration level and apply to the entire configuration's environment (all commands in a chain execute in this environment). The environment variables system supports both static and dynamic configurations:
+1. **Static Variables**
+   ```lua
+   env = {
+       DEBUG = "1",
+       BUILD_TYPE = "Release"
+   }
+   ```
 
-1. **Static Environment Variables**:
-```lua
-return {
-    test = {
-        name = "Run Tests",
-        env = {
-            NODE_ENV = "test",
-            DEBUG = "1"
-        },
-        cmd = "npm test"
-    },
-    deploy = {
-        name = "Deploy",
-        env = {
-            NODE_ENV = "production"
-        },
-        cmd = {
-            "npm run build",
-            "npm run deploy"
-        }
-    }
-}
-```
+2. **Dynamic Variables**
+   ```lua
+   env = {
+       PATH = function()
+           return vim.fn.expand("$PATH") .. ":/custom/path"
+       end
+   }
+   ```
 
-2. **Dynamic Environment Variables** using Lua functions:
-```lua
-return {
-    build = {
-        name = "Build Project",
-        env = {
-            BUILD_TIME = function()
-                return os.date("%Y%m%d_%H%M%S")
-            end,
-            GIT_BRANCH = function()
-                local handle = io.popen("git branch --show-current")
-                local branch = handle:read("*a")
-                handle:close()
-                return string.gsub(branch, "\n", "")
-            end
-        },
-        cmd = "npm run build"
-    }
-}
-```
+## Contributing
 
-3. **Conditional Environment Variables** using tables with conditions:
-```lua
-return {
-    deploy = {
-        name = "Deploy",
-        env = {
-            NODE_ENV = {
-                value = "production",
-                when = function()
-                    return vim.fn.getcwd():match("production")
-                end,
-            },
-            DEBUG = {
-                value = "1",
-                when = function()
-                    return vim.fn.filereadable(".debug")
-                end
-            }
-        },
-        cmd = "npm run deploy"
-    }
-}
-```
+Contributions are welcome! Please check out our [Contributing Guide](CONTRIBUTING.md) and [Developer Documentation](DEVELOPER.md).
 
-Environment variables are processed before command execution. For dynamic variables, the functions are called just before the command runs, ensuring up-to-date values. Conditional variables are evaluated based on their `when` function, and are not set if the function does not return `true`.
+## License
+
+MIT License - see [LICENSE](LICENSE) for details

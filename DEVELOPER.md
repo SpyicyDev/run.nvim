@@ -121,7 +121,6 @@ Manages plugin configuration and project-specific settings.
    ├── Extract Callbacks
    ├── Process Each Command
    │   ├── Check Conditions
-   │   ├── Handle Wait Conditions
    │   ├── Process Command
    │   └── Build Shell Command
    └── Execute in Single Terminal
@@ -137,7 +136,6 @@ Manages plugin configuration and project-specific settings.
 2. **Chain Level**:
    - Success/error callbacks
    - Proper error propagation
-   - Timeout handling for wait conditions
 
 ## Terminal Integration
 
@@ -191,8 +189,8 @@ When contributing to run.nvim:
     ":write",                                -- Save current buffer
     { cmd = "make", continue_on_error = true }, -- Build, continue if fails
     {
-        cmd = "echo 'Tests'",
-        when = function() return vim.v.shell_error == 0 end
+        cmd = "npm test",
+        when = function() return vim.v.shell_error == 0 end -- Only run if build succeeds
     },
     { cmd = "echo 'Done'", always_run = true }  -- Always runs
 }
