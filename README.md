@@ -9,10 +9,10 @@
 
 ### 🔄 Command Types
 - **Shell Commands**
-  - Execute any shell command
+  - Execute any shell command in a terminal buffer
   - Access to environment variables
   - File path substitution with `%f`
-  - Command output in terminal buffer
+  - Terminal output using FTerm.nvim
 - **Vim Commands**
   - Execute any Vim command with `:` prefix
   - Direct access to Vim state
@@ -20,35 +20,27 @@
   - Integration with other plugins
 - **Lua Functions**
   - Dynamic command generation
-  - Conditional command execution
+  - Return command strings
   - Access to Neovim API
   - Complex command logic
-- **Command Chaining**
-  - Sequential execution
-  - Conditional chaining
-  - Error handling
-  - Guaranteed execution options
 
 ### 🔗 Command Flow Control
 - **Sequential Execution**
   - Run commands in order
   - Single terminal instance
-  - Command output preservation
+  - Error handling
   - Exit code handling
 - **Conditional Execution**
   - `when` functions for control flow
-  - Access to previous command results
-  - Dynamic decision making
   - Skip conditions
+  - Dynamic decision making
 - **Error Handling**
   - `continue_on_error` option
   - Error reporting
   - Chain termination control
-  - Error status propagation
 - **Guaranteed Execution**
   - `always_run` commands
   - Cleanup operations
-  - Final status reporting
   - Resource cleanup
 
 ### 🌍 Environment Management
@@ -61,73 +53,40 @@
   - Function-based values
   - Runtime evaluation
   - Context-aware variables
-  - System integration
 - **System Integration**
   - Automatic PATH merging
   - Shell environment access
   - OS-specific variables
-  - Tool-specific configs
-- **Scoped Variables**
-  - Command-level overrides
-  - Chain-specific variables
-  - Temporary overrides
-  - Inheritance control
 
 ### 🛠️ Development Tools
 - **File Integration**
   - Automatic path detection
   - File type recognition
-  - Path substitution
+  - Path substitution (`%f`)
   - Working directory handling
 - **Project Configuration**
   - `run.nvim.lua` support
   - Hot reload capability
   - Default command setting
   - Project-wide settings
-- **Command Validation**
-  - Syntax checking
-  - Dependency verification
-  - Environment validation
-  - Security checks
-- **Execution Feedback**
-  - Colorful status output
-  - Error highlighting
-  - Progress indication
-  - Command timing
 
 ## 📦 Installation
+
+### Requirements
+- Neovim >= 0.8.0
+- [FTerm.nvim](https://github.com/numToStr/FTerm.nvim) (required for terminal commands)
 
 ### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
 {
-    "SpyicyDev/run.nvim",
-    dependencies = {
-        "numToStr/FTerm.nvim",  -- Required for terminal execution
-    },
-    opts = {
-        keys = {
-            run = "<leader>rr",      -- Run default command
-            run_proj = "<leader>rt", -- Show project command menu
-        },
-        filetype = {
-            python = "python3 %f",
-            lua = "lua %f",
-            javascript = "node %f",
-        }
-    }
-}
-```
-
-### Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
-
-```lua
-use {
     'SpyicyDev/run.nvim',
-    requires = { 'numToStr/FTerm.nvim' },
+    dependencies = {
+        'numToStr/FTerm.nvim', -- Required for terminal commands
+    },
     config = function()
         require('run').setup({
-            -- Your configuration here
+            -- your configuration here
         })
     end
 }
@@ -135,201 +94,131 @@ use {
 
 ## ⚙️ Configuration
 
-### Configuration Reference
-
-#### Global Configuration Options
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `keys.run` | `string` | `"<leader>rr"` | Keybinding to run the default command |
-| `keys.run_proj` | `string` | `"<leader>rt"` | Keybinding to show project command menu |
-| `filetype` | `table` | `{}` | Table of filetype-specific commands |
-
-#### Project Command Options
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | `string` | Yes | Display name for the command |
-| `cmd` | `string\|function\|table` | Yes | Command to execute (see Command Options) |
-| `env` | `table` | No | Environment variables for this command |
-
-#### Command Chain Options
-Commands within the `cmd` table can be either:
-- A string for direct execution
-- A function that returns a command string
-- A table with the following options:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `cmd` | `string\|function` | Yes | The command to execute |
-| `continue_on_error` | `boolean` | No | Continue chain if this command fails |
-| `when` | `function` | No | Function that determines if command should run |
-| `always_run` | `boolean` | No | Run command even if previous commands failed |
-| `env` | `table` | No | Environment variables for this specific command |
-
-#### Environment Variable Options
-
-| Field | Type | Example | Description |
-|-------|------|---------|-------------|
-| `string` | `string` | `"production"` | Static environment variable value |
-| `function` | `function` | `function() return vim.fn.getcwd() end` | Dynamic environment variable value |
-
-### Global Plugin Configuration
-
-Configure default behavior in your Neovim config:
-
+Default configuration:
 ```lua
 require('run').setup({
-    -- Default key mappings
     keys = {
-        run = "<leader>rr",      -- Run default command
-        run_proj = "<leader>rt", -- Show project command menu
+        run = "<leader>rr",      -- Run current file or project command
+        run_proj = "<leader>rt", -- Show project commands menu
     },
-    
-    -- Default commands for filetypes
     filetype = {
-        -- Basic shell command
-        python = "python3 %f",
-        
-        -- Vim command
-        lua = ":luafile %f",
-        
-        -- Function command
-        javascript = function()
-            local has_package = vim.fn.filereadable("package.json")
-            return has_package and "npm run dev" or "node %f"
-        end
+        -- Filetype-specific commands
+        -- Example:
+        -- python = "python3 %f",
+        -- javascript = "node %f",
     }
 })
 ```
 
-### Project Configuration
+## 📝 Project Configuration
 
 Create a `run.nvim.lua` file in your project root:
 
 ```lua
 return {
-    -- Basic command
+    -- Basic command configuration
+    test = {
+        name = "Run Tests",      -- Display name in selection menu
+        cmd = "npm test",        -- Command to execute
+        filetype = "javascript", -- Optional, limit to specific filetype
+        env = {                  -- Optional environment variables
+            NODE_ENV = "test"
+        }
+    },
+
+    -- Command with function
     build = {
         name = "Build Project",
-        cmd = "make",
-        env = { BUILD_TYPE = "Release" }
-    },
-
-    -- Command chain with conditions
-    test = {
-        name = "Run Tests",
-        cmd = {
-            ":write",                                -- Save buffer
-            { cmd = "make test", continue_on_error = true },
-            {
-                cmd = "npm test",
-                when = function() return vim.v.shell_error == 0 end
-            }
-        },
-        env = { NODE_ENV = "test" }
-    },
-
-    -- Interactive command
-    dev = {
-        name = "Development Server",
         cmd = function()
-            local port = vim.fn.input("Port (default 3000): ")
-            return string.format("npm run dev -- --port %s", port ~= "" and port or "3000")
-        end,
-        env = { NODE_ENV = "development" }
+            return "npm run build"
+        end
+    },
+
+    -- Command chain
+    deploy = {
+        name = "Deploy",
+        cmd = {
+            "npm run build",
+            {
+                cmd = "npm run test",
+                continue_on_error = true
+            },
+            {
+                cmd = "npm run deploy",
+                when = function()
+                    return vim.fn.filereadable("dist/index.js") == 1
+                end
+            }
+        }
     },
 
     -- Set default command
-    default = "build"
+    default = "test"
 }
 ```
 
 ## 🎯 Usage
 
 ### Commands
+- `:Run` - Run the current file's filetype command or project command
+- `:RunSetDefault` - Set a default command from the project configuration (only when project config exists)
+- `:RunReloadProj` - Reload the project configuration file
 
-- `:Run` - Execute the default command for current filetype or show project commands
-- `:RunSetDefault` - Set a default command from project commands
-- `:RunReloadProj` - Reload project configuration
+### Key Mappings
+Default mappings (can be customized in setup):
+- `<leader>rr` - Run the current file or project command
+- `<leader>rt` - Open project commands menu (only when project config exists)
 
-### Default Keybindings
-
-- `<leader>rr` - Run default command for current file/project
-- `<leader>rt` - Show project command menu
+Note: All mappings are buffer-local and only set when keys are configured.
 
 ### Command Types
+1. Shell Commands:
+   ```lua
+   cmd = "npm test"
+   ```
 
-1. **Shell Commands**
-```lua
-cmd = "make build"
-```
+2. Vim Commands:
+   ```lua
+   cmd = ":write | source %"
+   ```
 
-2. **Vim Commands**
-```lua
-cmd = ":write"
-```
+3. Lua Functions:
+   ```lua
+   cmd = function()
+       return "echo " .. vim.fn.expand("%")
+   end
+   ```
 
-3. **Lua Functions**
-```lua
-cmd = function()
-    if vim.fn.filereadable("Cargo.toml") then
-        return "cargo run"
-    elseif vim.fn.filereadable("package.json") then
-        return "npm start"
-    end
-    return "echo 'No project file found'"
-end
-```
+### Command Chain Options
+- `continue_on_error` - Continue chain if command fails
+- `when` - Only run if condition is true
+- `always_run` - Run even if previous commands failed
 
 ### Environment Variables
+1. Static Values:
+   ```lua
+   env = {
+       NODE_ENV = "development",
+       PORT = "3000"
+   }
+   ```
 
-1. **Static Variables**
-```lua
-env = {
-    NODE_ENV = "development",
-    DEBUG = "1"
-}
-```
+2. Dynamic Values:
+   ```lua
+   env = {
+       CURRENT_FILE = function()
+           return vim.fn.expand("%:p")
+       end
+   }
+   ```
 
-2. **Dynamic Variables**
-```lua
-env = {
-    -- Function that returns a value
-    PATH = function()
-        return vim.fn.expand("$PATH") .. ":/usr/local/bin"
-    end,
-    
-    -- Git branch example
-    GIT_BRANCH = function()
-        return vim.fn.system("git branch --show-current"):gsub("\n", "")
-    end
-}
-```
+Special Variables:
+- `%f` - Expands to the current buffer's file path
 
-### Advanced Command Chaining
+## 📚 Documentation
 
-```lua
-cmd = {
-    ":write",                                -- Save current buffer
-    { cmd = "npm run lint", continue_on_error = true },
-    { 
-        cmd = "npm test",
-        when = function() 
-            return vim.v.shell_error == 0 
-        end
-    },
-    {
-        cmd = "git push",
-        always_run = true  -- Will run even if previous commands fail
-    }
-}
-```
+For detailed documentation, see `:help run.nvim` in Neovim.
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📝 License
-
-MIT License - See [LICENSE](LICENSE) for details.
