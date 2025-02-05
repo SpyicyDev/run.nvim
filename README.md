@@ -45,11 +45,218 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ## Configuration
 
+### Plugin Configuration
+
 ```lua
 require("run").setup({
-    -- Your configuration options here
+    -- Default key mappings (set to false to disable)
+    keys = {
+        run = "<leader>rr",      -- Run default command
+        run_proj = "<leader>rt", -- Show project command menu
+    },
+    -- Default commands for filetypes
+    filetype = {
+        python = "python3 %f",
+        lua = "lua %f",
+        rust = "cargo run",
+        javascript = "node %f",
+        -- Add more filetype defaults
+    }
 })
 ```
+
+### Project Configuration (run.nvim.lua)
+
+Create a `run.nvim.lua` file in your project root. This file should return a table with your project-specific commands:
+
+```lua
+-- run.nvim.lua
+return {
+    -- Basic command
+    build = {
+        name = "Build Project",    -- Display name in command menu
+        cmd = "make",             -- Shell command to execute
+        env = {                   -- Optional environment variables
+            BUILD_TYPE = "Debug"
+        }
+    },
+
+    -- Command chain
+    test = {
+        name = "Run Tests",
+        cmd = {
+            ":write",                                -- Save before testing
+            { cmd = "make test", continue_on_error = true },
+            {
+                cmd = "npm test",
+                when = function() return vim.v.shell_error == 0 end
+            },
+            { cmd = "echo 'Tests completed'", always_run = true }
+        },
+        env = {
+            TEST_ENV = "development",
+            NODE_ENV = "test"
+        }
+    },
+
+    -- Dynamic command
+    run = {
+        name = "Smart Run",
+        cmd = function()
+            local file = vim.fn.expand("%:p")
+            if vim.fn.executable(file) then
+                return "./" .. file
+            elseif vim.fn.filereadable("Cargo.toml") then
+                return "cargo run"
+            elseif vim.fn.filereadable("package.json") then
+                return "npm start"
+            end
+            return nil  -- Skip if no valid command found
+        end,
+        env = {
+            -- Dynamic environment variables
+            PATH = function()
+                return vim.fn.expand("$PATH") .. ":/usr/local/bin"
+            end,
+            -- Static environment variables
+            DEBUG = "1"
+        }
+    }
+}
+```
+
+### Configuration Fields
+
+Each command in your `run.nvim.lua` can have the following fields:
+
+1. **Required Fields**:
+   - `name` (string): Display name for the command menu
+   - `cmd` (string|function|table): Command(s) to execute
+
+2. **Optional Fields**:
+   - `env` (table): Environment variables for the command
+
+3. **Command Types**:
+   - String: Direct shell or Vim command
+   - Function: Returns a command string or nil
+   - Table: Array of commands to chain
+
+4. **Chain Command Options**:
+   ```lua
+   {
+       cmd = "command",              -- The command to run
+       continue_on_error = true,     -- Continue chain if this fails
+       always_run = true,            -- Run even if previous commands failed
+       when = function() return true end  -- Condition for execution
+   }
+   ```
+
+### Command Patterns
+
+The following patterns in commands will be automatically replaced:
+- `%f`: Current file path
+
+### Environment Variables
+
+Environment variables can be specified in two ways:
+
+1. **Static Variables**:
+   ```lua
+   env = {
+       NODE_ENV = "development",
+       DEBUG = "1"
+   }
+   ```
+
+2. **Dynamic Variables**:
+   ```lua
+   env = {
+       PATH = function()
+           return vim.fn.expand("$PATH") .. ":/custom/path"
+       end,
+       GIT_BRANCH = function()
+           return vim.fn.system("git branch --show-current"):gsub("\n", "")
+       end
+   }
+   ```
+
+### Example Configurations
+
+1. **Node.js Project**:
+   ```lua
+   -- run.nvim.lua
+   return {
+       dev = {
+           name = "Development Server",
+           cmd = "npm run dev",
+           env = {
+               NODE_ENV = "development",
+               PORT = "3000"
+           }
+       },
+       build = {
+           name = "Production Build",
+           cmd = {
+               "npm run lint",
+               { cmd = "npm run test", continue_on_error = true },
+               "npm run build"
+           },
+           env = {
+               NODE_ENV = "production"
+           }
+       }
+   }
+   ```
+
+2. **Rust Project**:
+   ```lua
+   -- run.nvim.lua
+   return {
+       check = {
+           name = "Check and Test",
+           cmd = {
+               "cargo fmt --all -- --check",
+               "cargo clippy",
+               { cmd = "cargo test", always_run = true }
+           }
+       },
+       release = {
+           name = "Release Build",
+           cmd = function()
+               local target = vim.fn.input("Target: ")
+               if target ~= "" then
+                   return string.format("cargo build --release --target %s", target)
+               end
+               return "cargo build --release"
+           end
+       }
+   }
+   ```
+
+3. **Python Project**:
+   ```lua
+   -- run.nvim.lua
+   return {
+       dev = {
+           name = "Development Server",
+           cmd = {
+               {
+                   cmd = "poetry install",
+                   when = function()
+                       return vim.fn.filereadable("poetry.lock")
+                   end
+               },
+               "poetry run python manage.py runserver"
+           },
+           env = {
+               DJANGO_DEBUG = "1",
+               PYTHONPATH = function()
+                   return vim.fn.getcwd()
+               end
+           }
+       }
+   }
+   ```
 
 ## Usage
 
