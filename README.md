@@ -30,7 +30,7 @@ The following can be passed into opts:
   - `run_proj`: Key for opening project script menu (default: `<leader>rt`)
 - `filetype`: Filetype-specific default commands
 
-This is an example configuration:
+This is an example configuration using the default keys:
 
 ```lua
 opts = {
