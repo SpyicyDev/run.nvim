@@ -33,67 +33,30 @@ M.fmt_cmd = function(cmd)
 end
 
 -- run a cmd, either in term, vim command, or a lua function that optionally returns one of those
-M.run_cmd = function(cmd)
-    if not cmd then
-        vim.notify("Command is nil", vim.log.levels.ERROR, {
+M.run_cmd = function(cmd_section)
+    if not cmd_section then
+        vim.notify("Command section is nil", vim.log.levels.ERROR, {
             title = "run.nvim"
         })
         return false
     end
 
+    if not config.proj or not config.proj[cmd_section] then
+        vim.notify("Command section not found in project configuration", vim.log.levels.ERROR, {
+            title = "run.nvim"
+        })
+        return false
+    end
+
+    local cmd_config = config.proj[cmd_section]
+    local cmd = cmd_config.cmd
+
     -- Handle command chains
     if type(cmd) == "table" and #cmd > 0 then
-        return M.run_command_chain(cmd)
+        return M.run_command_chain(cmd, cmd_section)
     end
 
-    -- Handle complex single command
-    if type(cmd) == "table" and cmd.cmd then
-        -- Check conditions
-        if cmd.when and not cmd.when() then
-            return true -- Skip but don't count as error
-        end
-
-        -- Handle wait conditions
-        if cmd.wait_for then
-            local start_time = vim.loop.now()
-            local timeout = (cmd.timeout or 30) * 1000 -- Convert to ms
-            
-            while vim.loop.now() - start_time < timeout do
-                if cmd.wait_for() then
-                    break
-                end
-                vim.loop.sleep(1000) -- Check every second
-            end
-            
-            if vim.loop.now() - start_time >= timeout then
-                vim.notify("Timeout waiting for condition", vim.log.levels.ERROR, {
-                    title = "run.nvim"
-                })
-                return false
-            end
-        end
-
-        -- Set command environment if specified
-        local old_env = {}
-        if cmd.env then
-            for k, v in pairs(cmd.env) do
-                old_env[k] = vim.env[k]
-                vim.env[k] = v
-            end
-        end
-
-        local success = M.run_cmd(cmd.cmd)
-
-        -- Restore environment
-        if cmd.env then
-            for k, v in pairs(old_env) do
-                vim.env[k] = v
-            end
-        end
-
-        return success
-    end
-
+    -- Handle function that returns a command
     if type(cmd) == "function" then
         local success, result = pcall(cmd)
         if not success then
@@ -139,37 +102,18 @@ M.run_cmd = function(cmd)
         return false
     end
     
-    term.scratch({ cmd = cmd })
+    -- Get environment variables from the command section
+    local env = cmd_config.env
+    
+    term.scratch({ 
+        cmd = cmd,
+        env = env
+    })
     return true
 end
 
--- Process environment variables for the command chain
-local function process_environment(env_config)
-    if not env_config then return {} end
-    
-    local env = {}
-    for k, v in pairs(env_config) do
-        if type(v) == "function" then
-            env[k] = v()
-        elseif type(v) == "table" then
-            if v.when and v.when() then
-                env[k] = v.value
-            elseif v.prompt then
-                if v.type == "secret" then
-                    env[k] = vim.fn.inputsecret(v.prompt .. ": ")
-                else
-                    env[k] = vim.fn.input(v.prompt .. ": ")
-                end
-            end
-        else
-            env[k] = v
-        end
-    end
-    return env
-end
-
 -- Handle a chain of commands
-M.run_command_chain = function(commands)
+M.run_command_chain = function(commands, cmd_section)
     local callbacks = {}
     local shell_commands = {}
 
@@ -281,9 +225,13 @@ M.run_command_chain = function(commands)
         end
 
         local combined_cmd = table.concat(shell_commands, " && ")
-        -- Process environment variables at chain level
-        local env = process_environment(commands.env)
-        term.scratch({ cmd = combined_cmd, env = env })
+        -- Get environment variables from the command section
+        local env = config.proj[cmd_section] and config.proj[cmd_section].env
+        
+        term.scratch({ 
+            cmd = combined_cmd,
+            env = env
+        })
     end
 
     if callbacks.on_success then

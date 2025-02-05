@@ -28,6 +28,8 @@ Using `lazy.nvim`:
 ### Key Bindings
 
 - `<leader>rr`: Smart run command
+  - Without project config: Runs filetype-specific default command
+  - With project config: Runs project default or shows script menu
 - `<leader>rt`: Open project script menu (if project config exists)
 
 ### Commands
@@ -35,6 +37,124 @@ Using `lazy.nvim`:
 - `:Run`: Same as `<leader>rr`
 - `:RunSetDefault`: Set a default script for the current project
 - `:RunReloadProj`: Reload the project configuration file
+
+## Project Configuration
+
+The plugin uses a `run.nvim.lua` file for project-specific configurations. Here are some examples:
+
+### Basic Commands
+
+```lua
+return {
+    -- Simple command
+    test = {
+        name = "Run Tests",
+        cmd = "npm test"
+    },
+
+    -- Command with current file
+    compile = {
+        name = "Compile File",
+        cmd = "gcc %f -o out"  -- %f is replaced with current file path
+    }
+}
+```
+
+### Environment Variables
+
+Environment variables are specified at the chain level and apply to all commands in the chain:
+
+```lua
+return {
+    test = {
+        name = "Run Tests",
+        -- Environment variables for all commands
+        env = {
+            NODE_ENV = "test",
+            DEBUG = "1",
+            TEST_DB = "/path/to/test.db"
+        },
+        cmd = {
+            "npm run lint",    -- Will run with above env
+            "npm test",        -- Same env
+            "npm run e2e"      -- Same env
+        }
+    },
+
+    deploy = {
+        name = "Deploy",
+        env = {
+            NODE_ENV = "production",
+            DEPLOY_TARGET = "prod"
+        },
+        cmd = {
+            "npm run build",
+            "npm run deploy"
+        }
+    }
+}
+```
+
+### Command Chaining
+
+Commands can be chained using an array:
+
+```lua
+return {
+    build_and_test = {
+        name = "Build and Test",
+        env = {
+            NODE_ENV = "test"
+        },
+        cmd = {
+            -- Basic command chain
+            "npm run build",
+            "npm test",
+            
+            -- Command with condition
+            {
+                cmd = "npm run e2e",
+                when = function()
+                    return vim.fn.filereadable("e2e.config.js") == 1
+                end
+            },
+            
+            -- Command with wait condition
+            {
+                cmd = "docker-compose up -d db",
+                wait_for = function()
+                    return vim.fn.system("docker-compose ps db | grep healthy")
+                end,
+                timeout = 30  -- seconds
+            },
+            
+            -- Callbacks for the chain
+            on_success = function()
+                vim.notify("All commands completed!", vim.log.levels.INFO)
+            end,
+            on_error = function(failed_cmd)
+                vim.notify("Failed at: " .. failed_cmd, vim.log.levels.ERROR)
+            end
+        }
+    }
+}
+```
+
+### Command Options
+
+Each command in a chain can have these options:
+
+- `cmd`: The command to run (string or function)
+- `when`: Function that returns true if command should run
+- `continue_on_error`: Continue chain even if this command fails
+- `always_run`: Run this command even if previous commands failed
+- `wait_for`: Function that returns true when ready to proceed
+- `timeout`: Seconds to wait for wait_for condition (default: 30)
+
+Chain-level options:
+- `env`: Environment variables table for all commands
+- `on_success`: Function called if all commands succeed
+- `on_error`: Function called when a command fails
 
 ## Command Types
 
@@ -58,136 +178,4 @@ Commands can be specified in three ways:
      end
      return nil  -- Do nothing
    end
-   ```
-
-## Command Chaining
-
-Commands can be chained to run sequentially in the same terminal:
-
-```lua
-return {
-    build_and_test = {
-        name = "Build and Test",
-        cmd = {
-            -- Basic command chain
-            "npm run build",
-            "npm test",
-            
-            -- Command with condition
-            {
-                cmd = "npm run e2e",
-                when = function()
-                    return vim.fn.filereadable("e2e") == 1
-                end
-            },
-            
-            -- Command with wait condition
-            {
-                cmd = "docker-compose up -d db",
-                wait_for = function()
-                    return vim.fn.system("docker-compose ps db | grep healthy")
-                end,
-                timeout = 30  -- seconds
-            },
-            
-            -- Error handling
-            {
-                cmd = "npm run lint",
-                continue_on_error = true
-            },
-            
-            -- Callbacks
-            {
-                on_success = function()
-                    vim.notify("Build and test completed!")
-                end,
-                on_error = function(failed_cmd)
-                    vim.notify("Failed at: " .. failed_cmd)
-                end
-            }
-        }
-    }
-}
-```
-
-### Chain Options
-
-- `when`: Function that returns true if command should run
-- `wait_for`: Function that returns true when ready to proceed
-- `timeout`: Seconds to wait for wait_for condition (default: 30)
-- `continue_on_error`: Continue chain even if this command fails
-- `on_success`: Function called if all commands succeed
-- `on_error`: Function called when a command fails
-
-## Environment Variables
-
-Environment variables are specified at the chain level and apply to all commands in the chain:
-
-```lua
-return {
-    test = {
-        name = "Run Tests",
-        -- Chain-wide environment
-        env = {
-            -- Static value
-            NODE_ENV = "test",
-            
-            -- Dynamic value
-            TEST_DB = function()
-                return vim.fn.getcwd() .. "/test.db"
-            end,
-            
-            -- Conditional value
-            DEBUG = {
-                value = "1",
-                when = function()
-                    return vim.fn.filereadable(".debug") == 1
-                end
-            },
-            
-            -- Prompt value
-            API_KEY = {
-                prompt = "Enter test API key",
-                type = "secret"  -- Uses inputsecret
-            }
-        },
-        cmd = {
-            "npm run lint",
-            "npm test",
-            "npm run e2e"
-        }
-    }
-}
-```
-
-### Environment Value Types
-
-1. **Static Values**:
-   ```lua
-   KEY = "value"
-   ```
-
-2. **Dynamic Values**:
-   ```lua
-   KEY = function()
-       return "computed_value"
-   end
-   ```
-
-3. **Conditional Values**:
-   ```lua
-   KEY = {
-       value = "value",
-       when = function()
-           return vim.fn.filereadable(".env") == 1
-       end
-   }
-   ```
-
-4. **Prompt Values**:
-   ```lua
-   KEY = {
-       prompt = "Enter value",
-       type = "string" | "secret"
-   }
    ```

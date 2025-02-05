@@ -127,7 +127,14 @@ M.run_file = function()
 
     -- don't do anything if filetype is not set
     if exec ~= nil then
-        utils.run_cmd(exec)
+        if type(exec) == "string" then
+            -- Create a temporary command section for direct command strings
+            config.proj["_temp_filetype"] = { cmd = exec }
+            utils.run_cmd("_temp_filetype")
+            config.proj["_temp_filetype"] = nil
+        else
+            utils.run_cmd(exec)
+        end
     else
         vim.notify("No default script found for filetype " .. ftype .. "!", vim.log.levels.ERROR, {
             title = "run.nvim"
@@ -199,7 +206,12 @@ M.run_proj = function()
             return
         end
 
-        utils.run_cmd(exec)
+        for title, entry in pairs(config.proj) do
+            if type(entry) == "table" and entry.name == options[1] then
+                utils.run_cmd(title)
+                return
+            end
+        end
         return
     end
 
@@ -213,22 +225,16 @@ M.run_proj = function()
             return
         end
 
-        local exec
-        for _, entry in pairs(config.proj) do
-            if type(entry) == "table" and entry.name == choice and entry.cmd then
-                exec = entry.cmd
-                break
+        for title, entry in pairs(config.proj) do
+            if type(entry) == "table" and entry.name == choice then
+                utils.run_cmd(title)
+                return
             end
         end
 
-        if not exec then
-            vim.notify("Command not found for " .. choice, vim.log.levels.ERROR, {
-                title = "run.nvim"
-            })
-            return
-        end
-
-        utils.run_cmd(exec)
+        vim.notify("Command not found for " .. choice, vim.log.levels.ERROR, {
+            title = "run.nvim"
+        })
     end)
 end
 
@@ -256,7 +262,7 @@ M.run_proj_default = function()
         return
     end
 
-    utils.run_cmd(default_entry.cmd)
+    utils.run_cmd(config.proj.default)
 end
 
 -- brings up menu to set the default script from proj file
