@@ -201,21 +201,6 @@ M.run_command_chain = function(commands, cmd_section)
         processed_env = env.process_env(config.proj[cmd_section].env)
     end
 
-    -- Extract callbacks if they exist
-    local callbacks = {}
-    for i = #commands, 1, -1 do
-        local cmd = commands[i]
-        if type(cmd) == "table" then
-            if cmd.on_success then
-                callbacks.on_success = cmd.on_success
-                table.remove(commands, i)
-            elseif cmd.on_error then
-                callbacks.on_error = cmd.on_error
-                table.remove(commands, i)
-            end
-        end
-    end
-
     -- Process each command
     local vim_commands = {}
     local shell_commands = {}
@@ -316,13 +301,6 @@ M.run_command_chain = function(commands, cmd_section)
             )
             success = execute_shell_cmd(combined_cmd, processed_env)
         end
-    end
-
-    -- Handle callbacks
-    if success and callbacks.on_success then
-        callbacks.on_success()
-    elseif not success and callbacks.on_error then
-        callbacks.on_error()
     end
 
     return success

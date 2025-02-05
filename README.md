@@ -150,16 +150,6 @@ cmd = {
     {
         cmd = "npm run deploy",   -- Always run command
         always_run = true         -- Runs even if previous commands failed
-    },
-    {
-        on_success = function()   -- Success callback
-            vim.notify("Build succeeded!")
-        end
-    },
-    {
-        on_error = function()     -- Error callback
-            vim.notify("Build failed!", vim.log.levels.ERROR)
-        end
     }
 }
 ```
@@ -168,8 +158,6 @@ Command Chain Features:
 - `continue_on_error` - Continue executing chain even if this command fails
 - `when` - Conditional execution based on a function return value
 - `always_run` - Command runs regardless of previous command failures
-- `on_success` - Callback function executed if all commands succeed
-- `on_error` - Callback function executed if any command fails
 
 ## Environment Variables
 
@@ -206,8 +194,6 @@ env = {
 | `continue_on_error` | Chain command | boolean | No | Continue chain if command fails |
 | `when` | Chain command | function | No | Condition for command execution |
 | `always_run` | Chain command | boolean | No | Run command even if chain has failed |
-| `on_success` | Chain command | function | No | Callback on successful chain completion |
-| `on_error` | Chain command | function | No | Callback on chain failure |
 | `default` | Root config | string | No | Default command ID |
 
 ## Example run.nvim.lua Files
