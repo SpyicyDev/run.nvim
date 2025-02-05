@@ -1,7 +1,7 @@
 # run.nvim Developer Documentation
 
 ## Overview
-run.nvim is a Neovim plugin that provides a flexible and powerful command execution framework. It supports running shell commands, Vim commands, and Lua functions with advanced features like command chaining, environment variable management, and error handling.
+run.nvim is a Neovim plugin that provides a flexible command execution framework, focusing on project-specific commands, filetype integration, and user experience.
 
 ## Project Structure
 
@@ -9,213 +9,194 @@ run.nvim is a Neovim plugin that provides a flexible and powerful command execut
 run.nvim/
 ├── lua/
 │   └── run/
-│       ├── init.lua           # Plugin entry point and setup
+│       ├── init.lua           # Plugin entry point and main functionality
 │       ├── config.lua         # Configuration management
 │       └── utils/
 │           ├── init.lua       # Utils module aggregator
-│           ├── command.lua    # Command execution core
-│           ├── env.lua        # Environment variable handling
 │           ├── notify.lua     # Notification utilities
 │           ├── validation.lua # Input validation
-│           └── path.lua       # Path manipulation utilities
-```
-
-## Module Dependency Tree
-
-```mermaid
-graph TD
-    A[init.lua] --> B[config.lua]
-    A --> C[utils/init.lua]
-    C --> D[command.lua]
-    C --> E[env.lua]
-    C --> F[notify.lua]
-    C --> G[validation.lua]
-    C --> H[path.lua]
-    D --> F
-    D --> E
-    D --> G
+│           └── path.lua       # Path and config file utilities
 ```
 
 ## Core Components
 
-### 1. Command Execution (command.lua)
-The command execution module is the core of run.nvim. It handles:
-- Single command execution
-- Command chain processing
-- Command type detection and handling
-- Error management
+### 1. Main Module (init.lua)
+The main module handles:
+- Plugin initialization and setup
+- Command execution and menu interface
+- Project configuration management
+- Keybinding and command registration
 
-#### Command Types
-1. **Shell Commands**: Regular shell commands (e.g., "ls -la")
-2. **Vim Commands**: Commands starting with ":" (e.g., ":write")
-3. **Function Commands**: Lua functions that return commands
-
-#### Command Chain Format
+Key functions:
 ```lua
-{
-    "echo 'Start'",                              -- Simple shell command
-    ":write",                                    -- Vim command
-    function() return "echo 'Dynamic'" end,      -- Function command
-    {
-        cmd = "risky-command",
-        continue_on_error = true                 -- Error handling
+M.setup(opts)          -- Plugin initialization
+M.run()               -- Main command execution
+M.run_proj()          -- Project command menu
+M.run_file()          -- Filetype-specific execution
+M.set_default()       -- Set default command
+```
+
+### 2. Configuration (config.lua)
+Manages plugin state and configuration:
+
+```lua
+local config = {
+    opts = {},            -- Plugin options
+    proj = {},            -- Project configuration
+    proj_file_exists = false
+}
+
+-- Default configuration
+local defaults = {
+    keys = {
+        run = "<leader>rr",
+        run_proj = "<leader>rt",
     },
-    {
-        cmd = "echo 'Always'",
-        always_run = true                        -- Always executes
-    },
-    {
-        cmd = "conditional-cmd",
-        when = function() return checkCondition() end  -- Conditional execution
-    }
+    filetype = {}
 }
 ```
 
-### 2. Environment Variables (env.lua)
-Handles environment variable processing and system environment merging.
+### 3. Utilities
 
-#### Environment Configuration Format
+#### Notification (notify.lua)
 ```lua
-{
-    env = {
-        CUSTOM_VAR = "value",
-        PATH = function() return vim.fn.expand("$PATH") .. ":/custom/path" end
-    }
-}
+M.notify(msg, level)  -- Consistent notification interface
 ```
 
-### 3. Configuration (config.lua)
-Manages plugin configuration and project-specific settings.
-
-#### Configuration Format
+#### Validation (validation.lua)
 ```lua
-{
-    proj = {
-        build = {
-            cmd = "make",
-            env = { ... }
-        },
-        test = {
-            cmd = { ... }  -- Command chain
-        }
-    }
-}
+M.validate_cmd(cmd)   -- Command validation
+```
+
+#### Path (path.lua)
+```lua
+M.write_conf()        -- Project config file handling
 ```
 
 ## Command Execution Flow
 
-1. **Command Processing**:
+1. **Command Entry Points**:
    ```
-   Input Command
-   ├── Preprocess (handle %f substitution)
-   ├── Validate
-   └── Type Detection
-       ├── Function → Execute → Get Result
-       ├── Vim Command → Convert to Shell
-       └── Shell Command → Format
-   ```
-
-2. **Chain Execution**:
-   ```
-   Command Chain
-   ├── Extract Callbacks
-   ├── Process Each Command
-   │   ├── Check Conditions
-   │   ├── Process Command
-   │   └── Build Shell Command
-   └── Execute in Single Terminal
+   User Input
+   ├── Key Mapping
+   │   ├── <leader>rr → M.run()
+   │   └── <leader>rt → M.run_proj()
+   └── Commands
+       ├── :Run → M.run()
+       └── :RunSetDefault → M.set_default()
    ```
 
-## Error Handling
+2. **Command Processing**:
+   ```
+   M.run()
+   ├── Check Project Config
+   │   ├── Yes → Use Project Command
+   │   └── No → Use Filetype Command
+   └── Execute Command
+       ├── Validate
+       ├── Process
+       └── Execute
+   ```
 
-1. **Command Level**:
-   - `continue_on_error`: Allows chain to continue if command fails
-   - `always_run`: Ensures command runs regardless of previous failures
-   - Error callbacks for handling failures
+## Project Configuration
 
-2. **Chain Level**:
-   - Success/error callbacks
-   - Proper error propagation
+### 1. Structure
+```lua
+{
+    command_name = {
+        name = "Display Name",
+        cmd = "command string",
+        env = { -- optional
+            VAR = "value"
+        },
+        filetype = "specific_type" -- optional
+    },
+    default = "command_name" -- optional
+}
+```
 
-## Terminal Integration
-
-The plugin uses FTerm for terminal integration, providing:
-- Single terminal instance for command chains
-- Environment variable support
-- Non-blocking execution
-- Proper command output handling
+### 2. Loading Process
+```
+1. Find run.nvim.lua
+2. Load configuration
+3. Validate structure
+4. Store in config.proj
+```
 
 ## Best Practices
 
-1. **Command Construction**:
-   - Use command chains for related commands
-   - Leverage error handling options
-   - Utilize environment variables for configuration
+1. **Command Organization**:
+   - Use descriptive command names
+   - Group related commands
+   - Set appropriate defaults
 
 2. **Error Handling**:
-   - Always handle potential errors in function commands
-   - Use continue_on_error for non-critical commands
-   - Implement error callbacks for important operations
+   - Validate all inputs
+   - Provide clear error messages
+   - Handle missing configurations gracefully
 
-3. **Environment Variables**:
-   - Keep environment variables project-specific
-   - Use functions for dynamic values
-   - Merge with system environment when needed
+3. **User Experience**:
+   - Clear command names
+   - Consistent notifications
+   - Intuitive menu organization
 
 ## Contributing
 
 When contributing to run.nvim:
 
-1. **Code Organization**:
-   - Keep modules focused and single-purpose
-   - Follow existing error handling patterns
-   - Maintain proper module dependencies
+1. **Code Style**:
+   - Clear function names
+   - Consistent error handling
+   - Proper documentation
 
 2. **Testing**:
-   - Test all command types
-   - Verify error handling
-   - Check environment variable processing
+   - Test command execution
+   - Verify configuration loading
+   - Check error cases
 
 3. **Documentation**:
-   - Update this developer documentation
-   - Add inline comments for complex logic
-   - Include examples for new features
+   - Update README.md
+   - Update DEVELOPER.md
+   - Add inline documentation
 
 ## Common Patterns
 
-### 1. Command Chain with Error Handling
+### 1. Project Configuration
 ```lua
-{
-    ":write",                                -- Save current buffer
-    { cmd = "make", continue_on_error = true }, -- Build, continue if fails
-    {
-        cmd = "npm test",
-        when = function() return vim.v.shell_error == 0 end -- Only run if build succeeds
+return {
+    build = {
+        name = "Build Project",
+        cmd = "make"
     },
-    { cmd = "echo 'Done'", always_run = true }  -- Always runs
+    test = {
+        name = "Run Tests",
+        cmd = "npm test",
+        filetype = "javascript"
+    },
+    default = "build"
 }
 ```
 
-### 2. Dynamic Environment Variables
+### 2. Command Execution
 ```lua
-{
-    env = {
-        PATH = function()
-            local base_path = vim.fn.expand("$PATH")
-            local project_path = vim.fn.getcwd() .. "/bin"
-            return base_path .. ":" .. project_path
-        end
-    }
-}
+-- Direct execution
+M.run_cmd("command_name")
+
+-- Menu selection
+M.run_proj()
+
+-- Filetype handling
+M.run_file()
 ```
 
-### 3. Conditional Command Execution
+### 3. Configuration Validation
 ```lua
-{
-    cmd = "npm test",
-    when = function()
-        local file = io.open("package.json", "r")
-        return file ~= nil and io.close(file)
+local function validate_config(opts)
+    if opts.keys and type(opts.keys) ~= "table" then
+        error("keys configuration must be a table")
     end
-}
-```
+    
+    if opts.filetype and type(opts.filetype) ~= "table" then
+        error("filetype configuration must be a table")
+    end
+end

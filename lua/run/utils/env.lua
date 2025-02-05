@@ -1,101 +1,112 @@
 local M = {}
 
-local error = require("run.utils.error")
+local notify = require("run.utils.notify").notify
 
----Validate environment variable value
+---Validate an environment variable value
 ---@param value any The value to validate
----@param name string The name of the environment variable
 ---@return boolean is_valid Whether the value is valid
-local function validate_env_value(value, name)
-    local value_type = type(value)
-    
-    if value_type == "string" or value_type == "number" then
-        return true
+---@return string|nil error_message Error message if invalid
+local function validate_env_value(value)
+    if type(value) == "string" then
+        return true, nil
+    elseif type(value) == "function" then
+        return true, nil
+    elseif type(value) == "number" then
+        return true, nil
+    elseif value == nil then
+        return false, "Environment variable value cannot be nil"
+    else
+        return false, string.format("Invalid environment variable type: %s", type(value))
     end
-    
-    if value_type == "function" then
-        local ok, result = pcall(value)
-        if not ok then
-            error.env_error("Environment variable function failed", {
-                name = name,
-                details = result
-            })
-            return false
-        end
-        
-        if type(result) ~= "string" and type(result) ~= "number" then
-            error.validation_error("Environment variable function must return string or number", {
-                name = name,
-                got = type(result)
-            })
-            return false
-        end
-        
-        return true
-    end
-    
-    error.validation_error("Invalid environment variable type", {
-        name = name,
-        expected = "string, number, or function",
-        got = value_type
-    })
-    return false
 end
 
----Convert value to string
+---Convert a value to a string suitable for an environment variable
 ---@param value any The value to convert
----@return string|nil result The converted string or nil if conversion failed
-local function to_string(value)
+---@return string|nil The converted string or nil if invalid
+local function to_env_string(value)
+    if type(value) == "string" then
+        return value
+    elseif type(value) == "number" then
+        return tostring(value)
+    end
+    return nil
+end
+
+---Process a single environment variable
+---@param key string The environment variable key
+---@param value string|function|number The environment variable value or function
+---@return string|nil processed_value The processed value or nil if invalid
+local function process_single_env(key, value)
+    -- Handle function values
     if type(value) == "function" then
-        local ok, result = pcall(value)
-        if not ok then
-            error.env_error("Failed to evaluate environment variable function", {
-                details = result
-            })
+        local success, result = pcall(value)
+        if not success then
+            notify(string.format("Error evaluating environment variable %s: %s", key, result), vim.log.levels.ERROR)
             return nil
         end
+        
+        -- Validate function return value
+        local is_valid, error_msg = validate_env_value(result)
+        if not is_valid then
+            notify(string.format("Invalid return value for environment variable %s: %s", key, error_msg), vim.log.levels.ERROR)
+            return nil
+        end
+        
         value = result
     end
     
-    return tostring(value)
-end
-
----Process environment variables
----@param env_config table|nil The environment configuration
----@return table|nil env_vars The processed environment variables or nil if processing failed
-function M.process_env(env_config)
-    -- Return empty table if no environment config
-    if not env_config then
-        return {}
-    end
-    
-    -- Validate env_config is a table
-    if type(env_config) ~= "table" then
-        error.validation_error("Environment configuration must be a table", {
-            got = type(env_config)
-        })
+    -- Convert to string
+    local str_value = to_env_string(value)
+    if not str_value then
+        notify(string.format("Could not convert environment variable %s to string", key), vim.log.levels.ERROR)
         return nil
     end
     
-    local env_vars = {}
+    return str_value
+end
+
+---Process environment variables configuration
+---@param env_config table|nil The environment configuration to process
+---@return table processed_env The processed environment variables
+M.process_env = function(env_config)
+    local result = {}
     
-    -- Process each environment variable
-    for name, value in pairs(env_config) do
-        -- Validate value
-        if not validate_env_value(value, name) then
-            return nil
-        end
-        
-        -- Convert to string
-        local str_value = to_string(value)
-        if not str_value then
-            return nil
-        end
-        
-        env_vars[name] = str_value
+    -- Return empty table if no config
+    if not env_config then
+        return result
     end
     
-    return env_vars
+    -- Validate config type
+    if type(env_config) ~= "table" then
+        notify("Environment configuration must be a table", vim.log.levels.ERROR)
+        return result
+    end
+    
+    -- Process each environment variable
+    for key, value in pairs(env_config) do
+        -- Validate key
+        if type(key) ~= "string" then
+            notify(string.format("Environment variable key must be a string, got %s", type(key)), vim.log.levels.ERROR)
+            goto continue
+        end
+        
+        -- Validate value
+        local is_valid, error_msg = validate_env_value(value)
+        if not is_valid then
+            notify(string.format("Invalid environment variable %s: %s", key, error_msg), vim.log.levels.ERROR)
+            goto continue
+        end
+        
+        -- Process value
+        local processed_value = process_single_env(key, value)
+        if processed_value then
+            result[key] = processed_value
+        end
+        
+        ::continue::
+    end
+    
+    return result
 end
 
 ---Merge environment variables with system environment
