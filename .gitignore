@@ -1,0 +1,29 @@
+# Lua
+*.o
+*.so
+*.dll
+luac.out
+
+# Neovim
+.netrwhist
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Project specific
+test/temp/
+.luarc.json
+.luacheckcache
+.luacov
+.luacov.report.out
