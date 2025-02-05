@@ -1,0 +1,249 @@
+*run.txt*  A powerful and flexible command execution plugin for Neovim
+
+Author:   SpyicyDev
+License:  MIT
+Version:  1.0.0
+
+==============================================================================
+CONTENTS                                                           *run-contents*
+
+    1. Introduction .......................... |run-introduction|
+    2. Requirements .......................... |run-requirements|
+    3. Installation .......................... |run-installation|
+    4. Configuration ......................... |run-configuration|
+    5. Commands .............................. |run-commands|
+    6. Mappings ............................. |run-mappings|
+    7. Project Configuration ................. |run-project-config|
+    8. Command Types ......................... |run-command-types|
+    9. Environment Variables ................. |run-environment|
+    10. Command Chaining ..................... |run-command-chaining|
+    11. API ................................. |run-api|
+
+==============================================================================
+1. INTRODUCTION                                               *run-introduction*
+
+run.nvim is a powerful and flexible command execution plugin for Neovim that
+makes running project commands a breeze. Execute shell commands, Vim commands,
+and Lua functions with ease, all while maintaining project-specific
+configurations.
+
+==============================================================================
+2. REQUIREMENTS                                              *run-requirements*
+
+- Neovim >= 0.8.0
+- FTerm.nvim (for terminal command execution)
+
+==============================================================================
+3. INSTALLATION                                             *run-installation*
+
+Using lazy.nvim: >lua
+    {
+        'SpyicyDev/run.nvim',
+        dependencies = {
+            'numToStr/FTerm.nvim',
+        },
+        config = function()
+            require('run').setup({
+                -- your configuration here
+            })
+        end
+    }
+<
+
+==============================================================================
+4. CONFIGURATION                                           *run-configuration*
+
+Default configuration: >lua
+    require('run').setup({
+        keys = {
+            run = "<leader>rr",      -- Run current file or project command
+            run_proj = "<leader>rt", -- Show project commands menu
+        },
+        filetype = {
+            -- Filetype-specific commands
+            -- Example:
+            -- python = "python3 %f",
+            -- javascript = "node %f",
+        }
+    })
+<
+
+==============================================================================
+5. COMMANDS                                                     *run-commands*
+
+                                                                      *:Run*
+:Run                    Run the current file or project command based on context.
+
+                                                            *:RunSetDefault*
+:RunSetDefault          Set a default command from the project configuration.
+
+                                                           *:RunReloadProj*
+:RunReloadProj          Reload the project configuration file.
+
+==============================================================================
+6. MAPPINGS                                                     *run-mappings*
+
+Default key mappings (can be customized in setup):
+
+<leader>rr              Run the current file or project command
+<leader>rt              Open project commands menu (if project config exists)
+
+==============================================================================
+7. PROJECT CONFIGURATION                                  *run-project-config*
+
+Project-specific configuration is stored in a `run.nvim.lua` file in your
+project root. Example configuration: >lua
+
+    return {
+        -- Simple command
+        test = {
+            name = "Run Tests",
+            cmd = "npm test",
+        },
+
+        -- Command with environment variables
+        dev = {
+            name = "Start Development Server",
+            cmd = "npm run dev",
+            env = {
+                NODE_ENV = "development",
+                PORT = "3000"
+            }
+        },
+
+        -- Command chain
+        build = {
+            name = "Build Project",
+            cmd = {
+                "npm run clean",
+                "npm run build",
+                {
+                    cmd = "npm run test",
+                    continue_on_error = true
+                }
+            }
+        },
+
+        -- Default command
+        default = "test"
+    }
+<
+
+==============================================================================
+8. COMMAND TYPES                                           *run-command-types*
+
+run.nvim supports three types of commands:
+
+1. Shell Commands                                    *run-shell-commands*
+   Regular shell commands that will be executed in a terminal buffer: >lua
+   cmd = "npm test"
+<
+
+2. Vim Commands                                        *run-vim-commands*
+   Vim commands (prefixed with ":") that will be executed in Neovim: >lua
+   cmd = ":write | source %"
+<
+
+3. Lua Functions                                      *run-lua-commands*
+   Lua functions that will be executed and can return a command: >lua
+   cmd = function()
+       return "echo " .. vim.fn.expand("%")
+   end
+<
+
+==============================================================================
+9. ENVIRONMENT VARIABLES                                    *run-environment*
+
+Environment variables can be specified in two ways:
+
+1. Static Values: >lua
+    env = {
+        NODE_ENV = "development",
+        PORT = "3000"
+    }
+<
+
+2. Dynamic Values (using functions): >lua
+    env = {
+        CURRENT_FILE = function()
+            return vim.fn.expand("%:p")
+        end
+    }
+<
+
+Special Variables:
+    %f              Expands to the current file path
+
+==============================================================================
+10. COMMAND CHAINING                                    *run-command-chaining*
+
+Commands can be chained together with advanced control flow: >lua
+
+    cmd = {
+        -- Basic command
+        "npm run clean",
+
+        -- Command with error handling
+        {
+            cmd = "npm run build",
+            continue_on_error = true
+        },
+
+        -- Conditional command
+        {
+            cmd = "npm run test",
+            when = function()
+                return vim.fn.filereadable("package.json") == 1
+            end
+        },
+
+        -- Guaranteed execution
+        {
+            cmd = "echo 'Done!'",
+            always_run = true
+        },
+
+        -- Success callback
+        {
+            on_success = function()
+                vim.notify("Build successful!")
+            end
+        },
+
+        -- Error callback
+        {
+            on_error = function()
+                vim.notify("Build failed!", vim.log.levels.ERROR)
+            end
+        }
+    }
+<
+
+==============================================================================
+11. API                                                            *run-api*
+
+run.nvim exposes the following Lua API:
+
+require('run').setup(opts)                                     *run.setup()*
+    Initialize the plugin with the given options.
+
+require('run').run()                                            *run.run()*
+    Run the current file or project command.
+
+require('run').run_file()                                  *run.run_file()*
+    Run the default command for the current filetype.
+
+require('run').run_proj()                                  *run.run_proj()*
+    Show the project commands menu.
+
+require('run').run_proj_default()                    *run.run_proj_default()*
+    Run the default project command.
+
+require('run').set_default()                            *run.set_default()*
+    Set the default project command.
+
+require('run').reload_proj()                            *run.reload_proj()*
+    Reload the project configuration file.
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:
