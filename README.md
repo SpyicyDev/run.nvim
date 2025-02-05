@@ -7,31 +7,93 @@
 
 ## ✨ Features
 
-- 🔄 **Multiple Command Types**
-  - Shell commands with environment variables
-  - Vim commands (starting with ":")
-  - Dynamic Lua functions
-  - Command chaining with conditional execution
-
-- 🔗 **Smart Command Chaining**
-  - Run multiple commands in sequence
-  - Single terminal instance for all commands
-  - Conditional execution with `when` functions
-  - Error handling with `continue_on_error`
-  - Guaranteed execution with `always_run`
-
-- 🌍 **Environment Variables**
-  - Project-specific environment variables
-  - Dynamic variables using Lua functions
-  - Automatic merging with system environment
-  - Per-command environment overrides
-
-- 🛠️ **Smart Features**
+### 🔄 Command Types
+- **Shell Commands**
+  - Execute any shell command
+  - Access to environment variables
   - File path substitution with `%f`
-  - Command validation and error handling
-  - Colorful execution feedback
-  - Project-specific configurations
-  - Filetype-based command execution
+  - Command output in terminal buffer
+- **Vim Commands**
+  - Execute any Vim command with `:` prefix
+  - Direct access to Vim state
+  - Buffer manipulation
+  - Integration with other plugins
+- **Lua Functions**
+  - Dynamic command generation
+  - Conditional command execution
+  - Access to Neovim API
+  - Complex command logic
+- **Command Chaining**
+  - Sequential execution
+  - Conditional chaining
+  - Error handling
+  - Guaranteed execution options
+
+### 🔗 Command Flow Control
+- **Sequential Execution**
+  - Run commands in order
+  - Single terminal instance
+  - Command output preservation
+  - Exit code handling
+- **Conditional Execution**
+  - `when` functions for control flow
+  - Access to previous command results
+  - Dynamic decision making
+  - Skip conditions
+- **Error Handling**
+  - `continue_on_error` option
+  - Error reporting
+  - Chain termination control
+  - Error status propagation
+- **Guaranteed Execution**
+  - `always_run` commands
+  - Cleanup operations
+  - Final status reporting
+  - Resource cleanup
+
+### 🌍 Environment Management
+- **Project Variables**
+  - Project-specific settings
+  - Local development configs
+  - Environment overrides
+  - Path configurations
+- **Dynamic Variables**
+  - Function-based values
+  - Runtime evaluation
+  - Context-aware variables
+  - System integration
+- **System Integration**
+  - Automatic PATH merging
+  - Shell environment access
+  - OS-specific variables
+  - Tool-specific configs
+- **Scoped Variables**
+  - Command-level overrides
+  - Chain-specific variables
+  - Temporary overrides
+  - Inheritance control
+
+### 🛠️ Development Tools
+- **File Integration**
+  - Automatic path detection
+  - File type recognition
+  - Path substitution
+  - Working directory handling
+- **Project Configuration**
+  - `run.nvim.lua` support
+  - Hot reload capability
+  - Default command setting
+  - Project-wide settings
+- **Command Validation**
+  - Syntax checking
+  - Dependency verification
+  - Environment validation
+  - Security checks
+- **Execution Feedback**
+  - Colorful status output
+  - Error highlighting
+  - Progress indication
+  - Command timing
 
 ## 📦 Installation
 
@@ -88,11 +150,22 @@ use {
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | `string` | Yes | Display name for the command |
-| `cmd` | `string\|function\|table` | Yes | Command to execute (can be string, function, or command chain) |
+| `cmd` | `string\|function\|table` | Yes | Command to execute (see Command Options) |
 | `env` | `table` | No | Environment variables for this command |
-| `continue_on_error` | `boolean` | No | Whether to continue chain if this command fails |
+
+#### Command Chain Options
+Commands within the `cmd` table can be either:
+- A string for direct execution
+- A function that returns a command string
+- A table with the following options:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `cmd` | `string\|function` | Yes | The command to execute |
+| `continue_on_error` | `boolean` | No | Continue chain if this command fails |
 | `when` | `function` | No | Function that determines if command should run |
-| `always_run` | `boolean` | No | Whether to run command even if previous commands failed |
+| `always_run` | `boolean` | No | Run command even if previous commands failed |
+| `env` | `table` | No | Environment variables for this specific command |
 
 #### Environment Variable Options
 
