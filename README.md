@@ -4,30 +4,30 @@ A powerful and flexible command execution plugin for Neovim that makes running p
 
 ## Features
 
-- 🚀 **Command Management**
-  - Project-specific commands
-  - Filetype-specific defaults
-  - Command chaining with conditions
-  - Environment variable support
-  - Vim and shell command integration
+- **Multiple Command Types**
+  - Shell commands with environment variables
+  - Vim commands (starting with ":")
+  - Dynamic Lua functions
+  - Command chaining with conditional execution
+  
+- **Command Chaining**
+  - Run multiple commands in sequence
+  - All commands execute in a single terminal instance
+  - Conditional execution with `when` functions
+  - Error handling with `continue_on_error`
+  - Guaranteed execution with `always_run`
 
-- 🎯 **Smart Execution**
-  - Conditional command execution
-  - Error handling and recovery
-  - Command output in terminal
-  - Pattern substitution (%f)
+- **Environment Variables**
+  - Project-specific environment variables
+  - Dynamic variables using functions
+  - Automatic merging with system environment
+  - Per-command environment overrides
 
-- 🌍 **Project Configuration**
-  - Per-project command definitions
-  - Hot-reloadable configuration
-  - Default command selection
-  - Environment variable inheritance
-
-- 🛠️ **Developer Experience**
-  - Intuitive command menu
-  - Quick keyboard shortcuts
-  - Status notifications
-  - Automatic filetype detection
+- **Smart Command Processing**
+  - File path substitution (%f)
+  - Command validation
+  - Error handling and reporting
+  - Colorful command execution feedback
 
 ## Installation
 
@@ -36,10 +36,13 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 ```lua
 {
     "SpyicyDev/run.nvim",
+    dependencies = {
+        "numToStr/FTerm.nvim",  -- Required for terminal execution
+    },
     opts = {
         keys = {
-            run = "<leader>rr",      -- Run default/menu
-            run_proj = "<leader>rt", -- Show project menu
+            run = "<leader>rr",      -- Run default command
+            run_proj = "<leader>rt", -- Show project command menu
         },
         filetype = {
             python = "python3 %f",
@@ -52,73 +55,58 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ## Configuration
 
-### Plugin Options
+### Plugin Configuration
 
 ```lua
-{
-    -- Key mappings (set to false to disable)
+opts = {
+    -- Default key mappings
     keys = {
-        run = "<leader>rr",      -- Run default/menu
-        run_proj = "<leader>rt", -- Show project menu
+        run = "<leader>rr",      -- Run default command
+        run_proj = "<leader>rt", -- Show project command menu
     },
-    
     -- Default commands for filetypes
     filetype = {
+        -- Basic shell command
         python = "python3 %f",
-        lua = "lua %f",
-        javascript = "node %f",
-        -- Add more defaults...
+        
+        -- Vim command
+        lua = ":luafile %f",
+        
+        -- Function command
+        javascript = function()
+            local has_package = vim.fn.filereadable("package.json")
+            return has_package and "npm run dev" or "node %f"
+        end
     }
-}
+})
 ```
 
 ### Command Types
 
-1. **Basic Shell Command**:
-```lua
-build = {
-    name = "Build Project",
-    cmd = "make"
-}
-```
+1. **Shell Commands**: basic shell commands
+   ```lua
+   -- Basic shell command
+   cmd = "make build"
+   ```
 
-2. **Command with Environment**:
-```lua
-test = {
-    name = "Run Tests",
-    cmd = "npm test",
-    env = {
-        NODE_ENV = "test"
-    }
-}
-```
+2. **Vim Commands**: Vim commands
+   ```lua
+   -- Single Vim command
+   cmd = ":write"
+   ```
 
-3. **Command Chain**:
-```lua
-deploy = {
-    name = "Deploy",
-    cmd = {
-        "npm run build",
-        { cmd = "npm run test", continue_on_error = true },
-        "npm run deploy"
-    }
-}
-```
-
-4. **Conditional Command**:
-```lua
-lint = {
-    name = "Lint",
-    cmd = {
-        { 
-            cmd = "eslint .",
-            when = function() 
-                return vim.fn.filereadable(".eslintrc") 
-            end
-        }
-    }
-}
-```
+3. **Function Commands**: Lua function, can return one of above as a string or nil
+   ```lua
+   -- Dynamic command based on conditions
+   cmd = function()
+       if vim.fn.filereadable("Cargo.toml") then
+           return "cargo run"
+       elseif vim.fn.filereadable("package.json") then
+           return "npm start"
+       end
+       return "echo 'No project file found'"
+   end
+   ```
 
 ### Project Configuration (run.nvim.lua)
 
@@ -126,82 +114,117 @@ Create a `run.nvim.lua` file in your project root:
 
 ```lua
 return {
-    -- Commands
+    -- Basic command
     build = {
-        name = "Build",          -- Display name
-        cmd = "make",           -- Command to run
-        env = {                 -- Optional environment
-            DEBUG = "1"
+        name = "Build Project",
+        cmd = "make",
+        env = {
+            BUILD_TYPE = "Release"
         }
     },
 
     -- Command chain
     test = {
-        name = "Test",
+        name = "Run Tests",
         cmd = {
-            "npm run lint",
-            { cmd = "npm test", continue_on_error = true }
+            ":write",                                -- Save buffer
+            { cmd = "make test", continue_on_error = true },
+            {
+                cmd = "npm test",
+                when = function() return vim.v.shell_error == 0 end
+            }
+        },
+        env = {
+            NODE_ENV = "test"
         }
     },
 
-    -- Default command
-    default = "build"           -- Sets default command
+    -- Function command
+    dev = {
+        name = "Development Server",
+        cmd = function()
+            local port = vim.fn.input("Port (default 3000): ")
+            return string.format("npm run dev -- --port %s", port ~= "" and port or "3000")
+        end,
+        env = {
+            NODE_ENV = "development"
+        }
+    },
+
+    -- Set default command
+    default = "build"
 }
 ```
 
 ### Environment Variables
 
-Environment variables can be defined in two ways:
+Environment variables can be specified in two ways:
 
-1. **Static Values**:
-```lua
-env = {
-    NODE_ENV = "development",
-    DEBUG = "1"
-}
-```
+1. **Static Variables**:
+   ```lua
+   env = {
+       NODE_ENV = "development",
+       DEBUG = "1",
+       PORT = "3000"
+   }
+   ```
 
-2. **Dynamic Values**:
-```lua
-env = {
-    PATH = function()
-        return vim.fn.expand("$PATH") .. ":/usr/local/bin"
-    end,
-    TIMESTAMP = function()
-        return os.date("%Y%m%d")
-    end
-}
-```
-
-Features:
-- Inherits system environment
-- Supports dynamic values via functions
-- Project-specific overrides
-- Command-specific variables
+2. **Dynamic Variables**:
+   ```lua
+   env = {
+       -- Function that returns a value
+       PATH = function()
+           return vim.fn.expand("$PATH") .. ":/usr/local/bin"
+       end,
+       
+       -- Git branch example
+       GIT_BRANCH = function()
+           return vim.fn.system("git branch --show-current"):gsub("\n", "")
+       end,
+       
+       -- Project-specific path
+       PROJECT_ROOT = function()
+           return vim.fn.getcwd()
+       end
+   }
+   ```
 
 ### Command Chaining
 
-Command chains allow running multiple commands in sequence:
+Command chains allow running multiple commands in sequence with advanced control flow:
 
 ```lua
 cmd = {
-    "echo 'Starting...'",                        -- Basic command
-    { cmd = "npm run build", continue_on_error = true }, -- Continue on error
-    { 
-        cmd = "npm test",                        -- Conditional execution
+    ":write",                                -- Save current buffer
+    
+    -- Continue chain even if this fails
+    { cmd = "npm run lint", continue_on_error = true },
+    
+    -- Only run if previous command succeeded
+    {
+        cmd = "npm run test",
         when = function() return vim.v.shell_error == 0 end
     },
-    { cmd = "echo 'Done'", always_run = true }   -- Always runs
+    
+    -- Always runs, regardless of previous failures
+    { cmd = "echo 'Done'", always_run = true }
 }
 ```
 
 Features:
-- Sequential execution
-- Error handling with `continue_on_error`
-- Conditional execution with `when`
-- Guaranteed execution with `always_run`
-- Single terminal instance
-- Environment inheritance
+1. **Error Control**:
+   - `continue_on_error`: Continue chain if command fails
+   - `always_run`: Execute regardless of previous failures
+
+2. **Conditional Execution**:
+   - `when`: Function that determines if command should run
+   - Access to previous command results
+   - Full access to Neovim API
+
+3. **Command Types**:
+   - Mix shell and Vim commands
+   - Use function commands
+   - Access environment variables
 
 ## Example Configurations
 
@@ -211,59 +234,30 @@ Features:
 return {
     dev = {
         name = "Development Server",
-        cmd = "npm run dev",
+        cmd = {
+            { 
+                cmd = "npm install",
+                when = function()
+                    return vim.fn.filereadable("package-lock.json")
+                end
+            },
+            "npm run dev"
+        },
         env = {
             NODE_ENV = "development",
             PORT = "3000"
         }
     },
+    
     build = {
         name = "Production Build",
         cmd = {
             "npm run lint",
-            { cmd = "npm test", continue_on_error = true },
+            { cmd = "npm run test", continue_on_error = true },
             "npm run build"
         },
         env = {
             NODE_ENV = "production"
-        }
-    },
-    default = "dev"
-}
-```
-
-### Python Django Project
-```lua
--- run.nvim.lua
-return {
-    server = {
-        name = "Development Server",
-        cmd = {
-            { 
-                cmd = "poetry install",
-                when = function()
-                    return vim.fn.filereadable("poetry.lock")
-                end
-            },
-            "poetry run python manage.py runserver"
-        },
-        env = {
-            DJANGO_DEBUG = "1",
-            PYTHONPATH = function()
-                return vim.fn.getcwd()
-            end
-        }
-    },
-    test = {
-        name = "Run Tests",
-        cmd = {
-            "poetry run python manage.py test",
-            { 
-                cmd = "poetry run python manage.py migrate",
-                when = function()
-                    return vim.v.shell_error == 0
-                end
-            }
         }
     }
 }
@@ -277,33 +271,62 @@ return {
         name = "Check and Test",
         cmd = {
             "cargo fmt --all -- --check",
-            { cmd = "cargo clippy", continue_on_error = true },
-            "cargo test"
+            "cargo clippy",
+            { cmd = "cargo test", always_run = true }
         }
     },
-    run = {
-        name = "Run with Args",
+    
+    release = {
+        name = "Release Build",
         cmd = function()
-            local args = vim.fn.input("Args: ")
-            return string.format("cargo run -- %s", args)
-        end,
-        env = {
-            RUST_BACKTRACE = "1"
-        }
+            local target = vim.fn.input("Target: ")
+            if target ~= "" then
+                return string.format("cargo build --release --target %s", target)
+            end
+            return "cargo build --release"
+        end
     },
+    
     default = "check"
 }
 ```
 
-## Usage
-
-### Commands
-
-- `:Run` - Run default command or show menu
-- `:RunSetDefault` - Set default project command
-- `:RunReloadProj` - Reload project configuration
-
-### Key Mappings
-
-- `<leader>rr` - Run default command or show menu
-- `<leader>rt` - Show project command menu
+### Python Django Project
+```lua
+-- run.nvim.lua
+return {
+    dev = {
+        name = "Development Server",
+        cmd = {
+            {
+                cmd = "poetry install",
+                when = function()
+                    return vim.fn.filereadable("poetry.lock")
+                end
+            },
+            "poetry run python manage.py migrate",
+            "poetry run python manage.py runserver"
+        },
+        env = {
+            DJANGO_DEBUG = "1",
+            PYTHONPATH = function()
+                return vim.fn.getcwd()
+            end
+        }
+    },
+    
+    test = {
+        name = "Run Tests",
+        cmd = {
+            ":write",
+            "poetry run python manage.py test",
+            {
+                cmd = "poetry run python manage.py test --failfast",
+                when = function() return vim.v.shell_error ~= 0 end
+            }
+        },
+        env = {
+            DJANGO_SETTINGS_MODULE = "config.settings.test"
+        }
+    }
+}
