@@ -2,6 +2,15 @@
 
 A Neovim plugin for running scripts and commands with smart context awareness and project-specific configurations.
 
+## Command Types
+
+The plugin supports several types of commands:
+
+- **Shell Commands**: Simple string commands that run in a terminal (e.g., `"npm test"`).
+- **Vim Commands**: Commands prefixed with `:` that execute as Vim commands (e.g., `":w"`).
+- **Command Chains**: Arrays of commands that execute sequentially with error handling.
+- **Lua Functions**: Functions that can optionally return any of the above command types or nothing at all.
+
 ## Features
 
 - Run commands based on filetype or project configuration
@@ -101,81 +110,91 @@ Commands can be chained using an array:
 
 ```lua
 return {
-    build_and_test = {
-        name = "Build and Test",
-        env = {
-            NODE_ENV = "test"
-        },
+    build = {
+        name = "Build Project",
         cmd = {
-            -- Basic command chain
+            "npm install",
             "npm run build",
-            "npm test",
-            
-            -- Command with condition
-            {
-                cmd = "npm run e2e",
-                when = function()
-                    return vim.fn.filereadable("e2e.config.js") == 1
+            -- Lua function that returns a command or nil
+            function()
+                if vim.fn.filereadable("dist/index.js") == 1 then
+                    return "npm run test"
                 end
-            },
-            
-            -- Command with wait condition
-            {
-                cmd = "docker-compose up -d db",
-                wait_for = function()
-                    return vim.fn.system("docker-compose ps db | grep healthy")
-                end,
-                timeout = 30  -- seconds
-            },
-            
-            -- Callbacks for the chain
-            on_success = function()
-                vim.notify("All commands completed!", vim.log.levels.INFO)
             end,
-            on_error = function(failed_cmd)
-                vim.notify("Failed at: " .. failed_cmd, vim.log.levels.ERROR)
-            end
+            -- Vim command
+            ":echo 'Build complete!'"
         }
     }
 }
 ```
 
-### Command Options
+### Conditional Commands
 
-Each command in a chain can have these options:
+Commands can be made conditional using the `when` property:
 
-- `cmd`: The command to run (string or function)
-- `when`: Function that returns true if command should run
-- `continue_on_error`: Continue chain even if this command fails
-- `always_run`: Run this command even if previous commands failed
-- `wait_for`: Function that returns true when ready to proceed
-- `timeout`: Seconds to wait for wait_for condition (default: 30)
+```lua
+return {
+    build = {
+        name = "Build and Test",
+        cmd = {
+            "npm run build",
+            {
+                cmd = "npm test",
+                when = function()
+                    return vim.fn.filereadable("dist/index.js") == 1
+                end
+            }
+        }
+    }
+}
+```
 
-Chain-level options:
-- `env`: Environment variables table for all commands
-- `on_success`: Function called if all commands succeed
-- `on_error`: Function called when a command fails
+### Wait Conditions
 
-## Command Types
+Commands can wait for conditions using the `wait_for` property:
 
-Commands can be specified in three ways:
+```lua
+return {
+    start = {
+        name = "Start Server",
+        cmd = {
+            "npm start",
+            {
+                cmd = ":echo 'Server is ready!'",
+                wait_for = function()
+                    return vim.fn.filereadable(".pid") == 1
+                end,
+                timeout = 10  -- Timeout in seconds (default: 30)
+            }
+        }
+    }
+}
+```
 
-1. **Shell Commands** (run in terminal):
-   ```lua
-   cmd = "npm test"
-   ```
+### Error Handling
 
-2. **Vim Commands** (prefixed with `:`):
-   ```lua
-   cmd = ":Telescope find_files"
-   ```
+Commands can specify error handling behavior:
 
-3. **Lua Functions** (return command or nil):
-   ```lua
-   cmd = function()
-     if vim.fn.filereadable("Cargo.toml") then
-       return "cargo test"
-     end
-     return nil  -- Do nothing
-   end
-   ```
+```lua
+return {
+    deploy = {
+        name = "Deploy",
+        cmd = {
+            {
+                cmd = "npm run lint",
+                continue_on_error = true  -- Continue chain even if this fails
+            },
+            "npm run build",
+            "npm run deploy",
+            {
+                on_success = function()
+                    print("Deployment successful!")
+                end,
+                on_error = function(err)
+                    print("Deployment failed: " .. err)
+                end
+            }
+        }
+    }
+}
+```
