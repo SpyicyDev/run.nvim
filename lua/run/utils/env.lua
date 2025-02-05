@@ -1,5 +1,7 @@
 local M = {}
 
+local notify = require("run.utils.notify").notify
+
 -- Evaluate a single environment variable value
 local function evaluate_env_value(value)
     if type(value) == "function" then
@@ -7,9 +9,7 @@ local function evaluate_env_value(value)
         if success then
             return result
         end
-        vim.notify("Error evaluating environment variable function: " .. tostring(result), vim.log.levels.ERROR, {
-            title = "run.nvim"
-        })
+        notify("Error evaluating environment variable function: " .. tostring(result), vim.log.levels.ERROR)
         return nil
     end
     return value
@@ -20,9 +20,7 @@ local function evaluate_conditional_env(condition, value)
     if type(condition) == "function" then
         local success, result = pcall(condition)
         if not success then
-            vim.notify("Error evaluating condition function: " .. tostring(result), vim.log.levels.ERROR, {
-                title = "run.nvim"
-            })
+            notify("Error evaluating condition function: " .. tostring(result), vim.log.levels.ERROR)
             return nil
         end
         if result then
@@ -57,6 +55,25 @@ M.process_env = function(env_config)
     end
 
     return next(processed_env) and processed_env or nil
+end
+
+-- Merge environment variables with system environment
+M.merge_with_system_env = function(env_vars)
+    if not env_vars then
+        return nil
+    end
+
+    local merged_env = {}
+    -- Copy current environment
+    for k, v in pairs(vim.loop.os_environ()) do
+        merged_env[k] = v
+    end
+    -- Override with custom environment variables
+    for k, v in pairs(env_vars) do
+        merged_env[k] = tostring(v)
+    end
+
+    return merged_env
 end
 
 return M
