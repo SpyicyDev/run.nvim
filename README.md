@@ -23,36 +23,6 @@ Using `lazy.nvim`:
 }
 ```
 
-## Command Types
-
-Commands can be specified in three ways:
-
-1. **Shell Commands** (run in terminal):
-   ```lua
-   cmd = "npm test"
-   ```
-
-2. **Vim Commands** (prefixed with `:`):
-   ```lua
-   cmd = ":Telescope find_files"
-   ```
-
-3. **Lua Functions**:
-   ```lua
-   cmd = function()
-     if vim.fn.filereadable("Cargo.toml") then
-       return "cargo test"  -- Returns a shell command
-     elseif vim.fn.filereadable("package.json") then
-       return ":Telescope find_files"  -- Returns a vim command
-     end
-     return nil  -- Returns nothing, no command will be executed
-   end
-   ```
-   Lua functions can:
-   - Return a shell command string
-   - Return a vim command string (prefixed with `:`)
-   - Return nil to do nothing
-
 ## Usage
 
 ### Key Bindings
@@ -185,3 +155,27 @@ Chain-level options:
 - `env`: Environment variables table for all commands
 - `on_success`: Function called if all commands succeed
 - `on_error`: Function called when a command fails
+
+## Command Types
+
+Commands can be specified in three ways:
+
+1. **Shell Commands** (run in terminal):
+   ```lua
+   cmd = "npm test"
+   ```
+
+2. **Vim Commands** (prefixed with `:`):
+   ```lua
+   cmd = ":Telescope find_files"
+   ```
+
+3. **Lua Functions** (return command or nil):
+   ```lua
+   cmd = function()
+     if vim.fn.filereadable("Cargo.toml") then
+       return "cargo test"
+     end
+     return nil  -- Do nothing
+   end
+   ```
