@@ -217,10 +217,7 @@ return {
             NODE_ENV = "production",
             DEPLOY_TARGET = "prod"
         },
-        cmd = {
-            "npm run build",
-            "npm run deploy"
-        }
+        cmd = "npm run build"
     }
 }
 ```
