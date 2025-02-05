@@ -11,6 +11,8 @@ A powerful and flexible command execution plugin for Neovim that makes running p
 - 📁 Project-specific configuration via `run.nvim.lua`
 - 🎯 Default command selection for quick access
 - 🔍 Interactive command selection menu
+- 📝 Automatic reloading of project configuration on directory change
+- 📣 Visual feedback in the terminal for each command execution
 
 ## Requirements
 
@@ -101,6 +103,12 @@ return {
 }
 ```
 
+## Commands
+
+- `:Run` - Execute current file or project command
+- `:RunSetDefault` - Set default command from project configuration
+- `:RunReloadProj` - Reload project configuration file
+
 ## Command Types
 
 ### Single Commands
@@ -124,7 +132,7 @@ return {
 
 ### Command Chains
 
-Command chains allow executing multiple commands in sequence with control flow:
+Command chains allow executing multiple commands in sequence with advanced control flow:
 
 ```lua
 cmd = {
@@ -138,9 +146,30 @@ cmd = {
         when = function()         -- Only runs if condition is true
             return vim.fn.filereadable("package.json") == 1
         end
+    },
+    {
+        cmd = "npm run deploy",   -- Always run command
+        always_run = true         -- Runs even if previous commands failed
+    },
+    {
+        on_success = function()   -- Success callback
+            vim.notify("Build succeeded!")
+        end
+    },
+    {
+        on_error = function()     -- Error callback
+            vim.notify("Build failed!", vim.log.levels.ERROR)
+        end
     }
 }
 ```
+
+Command Chain Features:
+- `continue_on_error` - Continue executing chain even if this command fails
+- `when` - Conditional execution based on a function return value
+- `always_run` - Command runs regardless of previous command failures
+- `on_success` - Callback function executed if all commands succeed
+- `on_error` - Callback function executed if any command fails
 
 ## Environment Variables
 
@@ -176,6 +205,9 @@ env = {
 | `env` | Command config | table | No | Environment variables |
 | `continue_on_error` | Chain command | boolean | No | Continue chain if command fails |
 | `when` | Chain command | function | No | Condition for command execution |
+| `always_run` | Chain command | boolean | No | Run command even if chain has failed |
+| `on_success` | Chain command | function | No | Callback on successful chain completion |
+| `on_error` | Chain command | function | No | Callback on chain failure |
 | `default` | Root config | string | No | Default command ID |
 
 ## Example run.nvim.lua Files
