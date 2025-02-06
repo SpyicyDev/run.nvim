@@ -19,6 +19,8 @@ local defaults = {
     filetype = {}
 }
 
+local config_validation = require("run.utils.config_validation")
+
 ---Validate the configuration options
 ---@param opts table The configuration options to validate
 ---@return nil
@@ -40,6 +42,23 @@ function config.setup(opts)
     opts = opts or {}
     validate_config(opts)
     config.opts = vim.tbl_deep_extend("force", defaults, opts)
+end
+
+---Load and validate project configuration from run.nvim.lua
+---@param proj_config table The project configuration from run.nvim.lua
+---@return boolean success Whether the configuration was loaded successfully
+---@return string|nil error_message Error message if loading failed
+function config.load_proj_config(proj_config)
+    -- Validate project configuration
+    local is_valid, error_msg = config_validation.validate_config(proj_config)
+    if not is_valid then
+        return false, error_msg
+    end
+
+    -- Configuration is valid, store it
+    config.proj = proj_config
+    config.proj_file_exists = true
+    return true, nil
 end
 
 return config

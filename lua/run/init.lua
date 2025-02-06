@@ -31,7 +31,7 @@ M.setup = function(opts)
     end
 
     -- keymaps and user commands that should only be on in an active buffer
-    vim.api.nvim_create_autocmd("BufReadPre", {
+    vim.api.nvim_create_autocmd({ "VimEnter", "BufEnter" }, {
         desc = "Setup run keymap and user command",
         callback = function()
             -- ensure we have valid keys configured
@@ -63,6 +63,15 @@ M.setup = function(opts)
             end, { desc = "Reload run.nvim.lua" })
         end
     })
+
+    -- reload proj on write to run.nvim.lua
+    vim.api.nvim_create_autocmd({ "BufWritePost" }, {
+        pattern = "run.nvim.lua",
+        callback = function()
+            M.reload_proj()
+        end
+    })
+
 end
 
 --- Load and parse the project configuration file (run.nvim.lua)
@@ -73,10 +82,20 @@ M.setup_proj = function()
     if config.proj_file_exists then
         local ok, result = pcall(dofile, proj_file)
         if ok then
-            config.proj = result
+            local success, error_msg = config.load_proj_config(result)
+            if not success then
+                vim.notify("Invalid project configuration: " .. error_msg, vim.log.levels.ERROR, {
+                    title = "run.nvim"
+                })
+                config.proj = {}
+                config.proj_file_exists = false
+            end
         else
-            vim.notify("Error loading project configuration: " .. tostring(result), vim.log.levels.ERROR)
+            vim.notify("Error loading project configuration: " .. tostring(result), vim.log.levels.ERROR, {
+                title = "run.nvim"
+            })
             config.proj = {}
+            config.proj_file_exists = false
         end
     end
 end
