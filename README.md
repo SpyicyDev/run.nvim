@@ -106,7 +106,7 @@ return {
 ## Commands
 
 - `:Run` - Execute current file or project command
-- `:RunSetDefault` - Set default command from project configuration
+- `:RunSetDefault` - Set default command from project configuration (only available if project config exists)
 - `:RunReloadProj` - Reload project configuration file
 
 ## Command Types
@@ -202,6 +202,21 @@ env = {
     end
 }
 ```
+
+## Automatic Configuration Reloading
+
+The plugin automatically reloads the project configuration in the following cases:
+- When changing directories (`:cd`, `:lcd`, etc.)
+- When saving the `run.nvim.lua` file
+- When manually running `:RunReloadProj`
+
+## Error Handling
+
+The plugin provides helpful error notifications in the following cases:
+- Missing key configuration
+- Invalid project configuration format
+- Project configuration file loading errors
+- Command execution errors
 
 ## Configuration Options Reference
 
@@ -324,3 +339,5 @@ return {
     default = "run"
 }
 ```
+
+For more information and bug reports, please visit the [GitHub repository](https://github.com/SpyicyDev/run.nvim).

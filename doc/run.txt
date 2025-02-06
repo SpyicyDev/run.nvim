@@ -17,7 +17,9 @@ CONTENTS                                                           *run-contents
     8. Command Types ......................... |run-command-types|
     9. Environment Variables ................. |run-environment|
     10. Command Chaining ..................... |run-command-chaining|
-    11. API ................................. |run-api|
+    11. Automatic Reloading .................. |run-auto-reload|
+    12. Error Handling ....................... |run-error-handling|
+    13. API ................................. |run-api|
 
 ==============================================================================
 1. INTRODUCTION                                               *run-introduction*
@@ -199,59 +201,87 @@ Commands can be chained with control flow options: >lua
         -- Command with error handling
         {
             cmd = "npm run build",
-            continue_on_error = true  -- Continue chain if this command fails
+            continue_on_error = true  -- Continue chain even if this fails
         },
 
         -- Conditional command
         {
             cmd = "npm run test",
-            when = function()         -- Only run if condition is true
+            when = function()         -- Only runs if condition is true
                 return vim.fn.filereadable("package.json") == 1
             end
         },
 
         -- Always run command
         {
-            cmd = "echo 'Done!'",
-            always_run = true         -- Run even if previous commands failed
+            cmd = "npm run deploy",
+            always_run = true         -- Runs even if previous commands failed
         }
     }
 <
 
+Chain Command Options:
+    continue_on_error    Continue chain even if this command fails
+    when                 Function that determines if command should run
+    always_run          Run command even if previous commands failed
+
 ==============================================================================
-11. API                                                            *run-api*
+11. AUTOMATIC RELOADING                                    *run-auto-reload*
 
-run.nvim exposes the following Lua API:
+The plugin automatically reloads project configuration in these cases:
 
-                                                              *run.setup()*
-setup({opts})
+1. Directory Changes
+   Configuration is reloaded when changing directories using :cd, :lcd, etc.
+
+2. File Changes
+   Configuration is reloaded when saving the run.nvim.lua file.
+
+3. Manual Reload
+   Configuration can be reloaded using :RunReloadProj command.
+
+==============================================================================
+12. ERROR HANDLING                                      *run-error-handling*
+
+The plugin provides error notifications in these cases:
+
+1. Configuration Errors
+   - Missing key configuration
+   - Invalid project configuration format
+   - Project configuration file loading errors
+
+2. Command Errors
+   - Command execution failures
+   - Invalid command format
+   - Missing required command fields
+
+3. Environment Errors
+   - Invalid environment variable format
+   - Failed dynamic environment variable evaluation
+
+All errors are displayed using Neovim's notification system with appropriate
+error levels and descriptive messages.
+
+==============================================================================
+13. API                                                          *run-api*
+
+run.nvim provides a Lua API for programmatic control:
+
+setup({opts})                                                  *run.setup()*
     Initialize the plugin with configuration options.
     Parameters: ~
-        {opts}    Configuration options table (see |run-configuration|)
+        {opts}    Configuration table (see |run-configuration|)
 
-                                                                *run.run()*
-run()
-    Run the current file or project command based on context.
+run()                                                           *run.run()*
+    Run the current file or project command.
 
-                                                           *run.run_file()*
-run_file()
-    Run the default command for the current filetype.
+run_proj()                                                 *run.run_proj()*
+    Show the project commands menu (only when project config exists).
 
-                                                           *run.run_proj()*
-run_proj()
-    Show the project commands menu.
-
-                                                    *run.run_proj_default()*
-run_proj_default()
-    Run the default project command.
-
-                                                         *run.set_default()*
-set_default()
-    Set the default project command.
-
-                                                         *run.reload_proj()*
-reload_proj()
+reload_proj()                                           *run.reload_proj()*
     Reload the project configuration file.
 
-==============================================================================
+set_default()                                           *run.set_default()*
+    Set the default command from project configuration.
+    Only available when project config exists.
+
  vim:tw=78:ts=8:ft=help:norl:
