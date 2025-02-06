@@ -103,22 +103,6 @@ local function execute_shell_cmd(cmd, env_vars)
     return true
 end
 
----Execute a single command of any type
----@param cmd string The command to execute
----@param env_vars table|nil Environment variables for the command
----@return boolean success Whether the command executed successfully
-local function execute_single_cmd(cmd, env_vars)
-    if type(cmd) ~= "string" then return false end
-    
-    -- Handle Vim commands
-    if cmd:sub(1, 1) == ":" then
-        return execute_vim_cmd(cmd)
-    end
-    
-    -- Handle shell commands
-    return execute_shell_cmd(cmd, env_vars)
-end
-
 -- Public API
 
 ---Format and validate a command string
