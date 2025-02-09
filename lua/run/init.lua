@@ -147,6 +147,7 @@ M.run_file = function()
         return
     end
 
+
     local ftype = vim.filetype.match({ filename = buf })
     if not ftype then
         vim.notify("Could not determine filetype", vim.log.levels.ERROR, {
@@ -166,10 +167,11 @@ M.run_file = function()
 
     -- don't do anything if filetype is not set
     if exec ~= nil then
-        if type(exec) == "string" then
+        if type(exec) == "string" or type(exec) == "function" then
             -- Create a temporary command section for direct command strings
-            local temp_cmd = { cmd = exec }
-            utils.run_cmd(temp_cmd)
+            config.proj["_temp_filetype"] = { cmd = exec }
+            utils.run_cmd("_temp_filetype")
+            config.proj["_temp_filetype"] = nil
         elseif type(exec) == "table" then
             -- Handle table configuration with cmd and env
             if not exec.cmd then
@@ -178,11 +180,12 @@ M.run_file = function()
                 })
                 return
             end
-            local temp_cmd = {
+            config.proj["_temp_filetype"] = {
                 cmd = exec.cmd,
                 env = exec.env
             }
-            utils.run_cmd(temp_cmd)
+            utils.run_cmd("_temp_filetype")
+            config.proj["_temp_filetype"] = nil
         else
             utils.run_cmd(exec)
         end
