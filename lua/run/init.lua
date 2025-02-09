@@ -168,9 +168,8 @@ M.run_file = function()
     if exec ~= nil then
         if type(exec) == "string" then
             -- Create a temporary command section for direct command strings
-            config.proj["_temp_filetype"] = { cmd = exec }
-            utils.run_cmd("_temp_filetype")
-            config.proj["_temp_filetype"] = nil
+            local temp_cmd = { cmd = exec }
+            utils.run_cmd(temp_cmd)
         elseif type(exec) == "table" then
             -- Handle table configuration with cmd and env
             if not exec.cmd then
@@ -179,12 +178,11 @@ M.run_file = function()
                 })
                 return
             end
-            config.proj["_temp_filetype"] = {
+            local temp_cmd = {
                 cmd = exec.cmd,
                 env = exec.env
             }
-            utils.run_cmd("_temp_filetype")
-            config.proj["_temp_filetype"] = nil
+            utils.run_cmd(temp_cmd)
         else
             utils.run_cmd(exec)
         end
