@@ -1,37 +1,26 @@
-# 🚀 run.nvim
+# run.nvim
 
-> A powerful and flexible command execution plugin for Neovim
+A powerful and flexible command execution plugin for Neovim that makes running project commands a breeze. Execute shell commands, Vim commands, and Lua functions with ease, all while maintaining project-specific configurations.
 
-[![Lua](https://img.shields.io/badge/Lua-blue.svg?logo=lua)](http://www.lua.org)
-[![Neovim](https://img.shields.io/badge/Neovim%200.8+-57A143?logo=neovim)](https://neovim.io)
+## Features
 
-Run project commands, filetype-specific scripts, or custom commands with ease directly from Neovim. Supports shell commands, Vim commands, and dynamic Lua functions.
+- 🚀 Execute commands based on filetype or project context
+- 📄 File path substitution (`%f` gets replaced with the current file path)
+- ⚡ Support for shell commands, Vim commands, and Lua functions
+- 📁 Project-specific configuration via `run.nvim.lua`
+- 🎯 Default command selection for quick access
+- 🔍 Interactive command selection menu
+- 📝 Automatic reloading of project configuration on directory change
+- 📣 Terminal integration with FTerm.nvim
 
-https://github.com/SpyicyDev/run.nvim/assets/your-username/your-repo/assets/demo.gif
-
-## ✨ Features
-
-- **Project-Aware Commands**: Define project-specific commands in `run.nvim.lua`
-- **Filetype Support**: Automatic command selection based on file type
-- **Multiple Command Types**:
-  - Shell commands
-  - Vim commands
-  - Dynamic Lua functions
-- **Smart Path Substitution**: Automatic `%f` replacement with current file path
-- **Interactive Menu**: Easy command selection with Telescope/fzf-lua
-- **Automatic Reloading**: Project config reloads on change or directory switch
-- **Terminal Integration**: Seamless terminal execution with FTerm.nvim
-
-## 📦 Requirements
+## Requirements
 
 - Neovim >= 0.8.0
-- [FTerm.nvim](https://github.com/numToStr/FTerm.nvim) (for terminal command execution)
+- [FTerm.nvim](https://github.com/numToStr/FTerm.nvim) (required for terminal command execution)
 
-## ⚙️ Installation
+## Installation
 
-Install with your favorite package manager:
-
-### [lazy.nvim](https://github.com/folke/lazy.nvim)
+Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
@@ -39,15 +28,13 @@ Install with your favorite package manager:
     dependencies = {
         'numToStr/FTerm.nvim',
     },
-    config = function()
-        require('run').setup({
-            -- Your configuration here
-        })
-    end,
+    opts = {
+        -- your configuration here (see below)
+    },
 }
 ```
 
-### [packer.nvim](https://github.com/wbthomason/packer.nvim)
+Using [packer.nvim](https://github.com/wbthomason/packer.nvim):
 
 ```lua
 use {
@@ -57,28 +44,25 @@ use {
     },
     config = function()
         require('run').setup({
-            -- Your configuration here
+            -- your configuration here (see below)
         })
     end
 }
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Default Configuration
 
 ```lua
 require('run').setup({
-    -- Key mappings
     keys = {
         run = "<leader>rr",      -- Run current file or project command
         run_proj = "<leader>rt", -- Show project commands menu
     },
-    
-    -- Filetype-specific commands
-    -- Used when no project configuration exists
     filetype = {
-        -- Your filetype commands here
+        -- Filetype-specific commands
+        -- Will be used when no project configuration exists
     }
 })
 ```
@@ -86,23 +70,19 @@ require('run').setup({
 ### Example Configuration
 
 ```lua
-local function has_package_json()
-    return vim.fn.filereadable("package.json") == 1
-end
-
 require('run').setup({
     keys = {
-        run = "<leader>rr",
-        run_proj = "<leader>rt",
+        run = "<leader>rr",      -- Run current file or project command
+        run_proj = "<leader>rt", -- Show project commands menu
     },
     filetype = {
-        -- Simple shell command
+        -- Shell command with file substitution (%f becomes the current file path)
         python = "python3 %f",
         
-        -- Vim command
+        -- Vim command (prefixed with :)
         lua = ":luafile %f",
         
-        -- Dynamic Lua function
+        -- Function that returns a command
         javascript = function()
             local file = vim.fn.expand("%:p")
             return string.format("node %s", file)
@@ -110,137 +90,114 @@ require('run').setup({
         
         -- Table configuration
         rust = {
-            cmd = "cargo run",
-            name = "Run with Cargo"
+            cmd = "cargo run"
         },
         
-        -- Conditional command
+        -- TypeScript project commands
         typescript = {
-            cmd = function()
-                if has_package_json() then
-                    return "npm run start"
-                end
-                return "npx ts-node %f"
-            end
+            cmd = "npx ts-node %f"
         },
-        
+
         -- C/C++ compilation
         c = "gcc -o %:r %f && ./%:r",
-        cpp = "g++ -o %:r %f && ./%:r",
-        
-        -- Run tests if test file, otherwise run main file
-        go = function()
-            local filename = vim.fn.expand("%:t")
-            if string.find(filename, "_test.go$") then
-                return "go test -v"
-            end
-            return "go run %f"
-        end
+        cpp = "g++ -o %:r %f && ./%:r"
     }
 })
 ```
 
-## 📁 Project Configuration
+## Project Configuration File
 
-Create a `run.nvim.lua` file in your project root to define project-specific commands:
+The `run.nvim.lua` file in your project root defines project-specific commands and configurations. It should return a Lua table with your command configurations.
+
+### Basic Structure
 
 ```lua
 return {
-    -- Simple command
-    test = {
-        name = "Run Tests",
-        cmd = "npm test"
+    command_id = {
+        name = "Display Name",      -- Name shown in selection menu
+        cmd = "command to run",     -- Command to execute
+        filetype = "filetype",      -- Optional, limit to specific filetype
     },
-    
-    -- Command with filetype restriction
-    format = {
-        name = "Format Code",
-        cmd = "prettier --write %f",
-        filetype = {"javascript", "typescript", "css", "json"}
-    },
-    
-    -- Dynamic command
-    start_dev = {
-        name = "Start Dev Server",
-        cmd = function()
-            if vim.fn.filereadable("package.json") == 1 then
-                return "npm run dev"
-            end
-            return "echo 'No dev script found in package.json'"
-        end
-    },
-    
-    -- Set default command
-    default = "test"
+    default = "command_id"          -- Optional default command
 }
 ```
 
-## 🚀 Usage
+## Commands
 
-### Commands
+- `:Run` - Execute current file or project command
+- `:RunSetDefault` - Set default command from project configuration (only available if project config exists)
+- `:RunReloadProj` - Reload project configuration file
 
-| Command           | Description                                      |
-|-------------------|--------------------------------------------------|
-| `:Run`           | Execute current file or project command         |
-| `:RunSetDefault` | Set default command from project configuration   |
-| `:RunReloadProj` | Reload project configuration file               |
+## Command Types
 
+### Shell Commands
 
-### Key Mappings
-
-| Key          | Mode | Description                                  |
-|--------------|------|----------------------------------------------|
-| `<leader>rr` | n    | Run current file or project command         |
-| `<leader>rt` | n    | Show project commands menu (if configured)   |
-
-
-## 🔄 Command Types
-
-### 1. Shell Commands
-
-Run any shell command in a terminal buffer:
+Regular shell commands are executed in a terminal via FTerm:
 
 ```lua
-cmd = "npm start"
+cmd = "npm test"
 ```
 
-### 2. Vim Commands
+### Vim Commands
 
-Execute Vim commands directly (prefix with `:`):
+Vim commands (prefixed with `:`) are executed directly in Neovim:
 
 ```lua
-cmd = ":write | source % | echo 'File reloaded!'"
+cmd = ":write | source %"
 ```
 
-### 3. Lua Functions
+### Lua Functions
 
-Dynamic commands with Lua functions:
+Functions that return a command string:
 
 ```lua
+-- Return a shell command
 cmd = function()
-    local file = vim.fn.expand("%:p")
+    return "echo " .. vim.fn.expand("%")
+end
+
+-- Return a Vim command
+cmd = function()
+    return ":luafile " .. vim.fn.expand("%")
+end
+
+-- Return nil to skip execution
+cmd = function()
     if vim.fn.filereadable("package.json") == 1 then
         return "npm test"
     end
-    return string.format("echo 'No tests for %s'", file)
+    return nil  -- Skip if no package.json
 end
 ```
 
-## 📝 Tips
+Functions can:
+- Return a shell command string
+- Return a Vim command string (prefixed with `:`)
+- Return `nil` to skip execution
+- Perform complex logic to determine the appropriate command
 
-- Use `%f` in your commands to get the current file path
-- Return `nil` from a Lua function to skip command execution
-- The project configuration automatically reloads when you save `run.nvim.lua`
-- Set a `default` command in your project config to skip the selection menu
+## Automatic Configuration Reloading
 
-## 🤝 Contributing
+The plugin automatically reloads the project configuration in the following cases:
+- When changing directories (`:cd`, `:lcd`, etc.)
+- When saving the `run.nvim.lua` file
+- When manually running `:RunReloadProj`
 
-Contributions are welcome! Please open an issue or submit a pull request.
+## Command Execution Logic
 
-## 📜 License
+When you run `:Run` or press the configured keybinding:
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+1. If no project configuration exists (`run.nvim.lua`):
+   - The plugin tries to run the filetype-specific command for the current file
+   - If no filetype command exists, it shows an error
 
+2. If project configuration exists:
+   - If a default command is set, it runs that command
+   - If no default is set, it shows the command selection menu
+
+## Configuration Options Reference
+
+| Option | Location | Type | Description |
 |--------|----------|------|-------------|
 | `keys.run` | Setup | string | Keybinding to run current file or project command |
 | `keys.run_proj` | Setup | string | Keybinding to show project commands menu |
