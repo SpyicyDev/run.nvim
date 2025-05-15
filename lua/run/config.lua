@@ -1,16 +1,11 @@
----Configuration module for run.nvim
----@class Config
----@field opts table Plugin options
----@field proj table Project-specific configuration
----@field proj_file_exists boolean Whether a project configuration file exists
+-- Configuration module for run.nvim
 local config = {
     opts = {},
     proj = {},
     proj_file_exists = false
 }
 
----Default configuration values
----@type table
+-- Default configuration values
 local defaults = {
     keys = {
         run = "<leader>rr",
@@ -18,8 +13,6 @@ local defaults = {
     },
     filetype = {}
 }
-
-local config_validation = require("run.utils.config_validation")
 
 ---Validate the configuration options
 ---@param opts table The configuration options to validate
@@ -49,8 +42,9 @@ end
 ---@return boolean success Whether the configuration was loaded successfully
 ---@return string|nil error_message Error message if loading failed
 function config.load_proj_config(proj_config)
-    -- Validate project configuration
-    local is_valid, error_msg = config_validation.validate_config(proj_config)
+    -- Validation is now done in utils.lua
+    local utils = require("run.utils")
+    local is_valid, error_msg = utils.validate_config(proj_config)
     if not is_valid then
         return false, error_msg
     end

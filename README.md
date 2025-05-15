@@ -5,8 +5,7 @@ A powerful and flexible command execution plugin for Neovim that makes running p
 ## Features
 
 - 🚀 Execute commands based on filetype or project context
-- 🔄 Chain multiple commands with conditional execution
-- 🌍 Dynamic environment variables and file path substitution
+- 📄 File path substitution
 - ⚡ Support for shell commands, Vim commands, and Lua functions
 - 📁 Project-specific configuration via `run.nvim.lua`
 - 🎯 Default command selection for quick access
@@ -72,12 +71,9 @@ require('run').setup({
             return string.format("node %s", file)
         end,
         
-        -- Command with environment variables
+        -- Command with options
         rust = {
-            cmd = "cargo run",
-            env = {
-                RUST_BACKTRACE = "1"
-            }
+            cmd = "cargo run"
         }
     }
 })
@@ -93,11 +89,8 @@ The `run.nvim.lua` file in your project root defines project-specific commands a
 return {
     command_id = {
         name = "Display Name",      -- Name shown in selection menu
-        cmd = "command to run",     -- Command or command chain
+        cmd = "command to run",     -- Command to execute
         filetype = "filetype",      -- Optional, limit to specific filetype
-        env = {                     -- Optional environment variables
-            KEY = "value"
-        }
     },
     default = "command_id"          -- Optional default command
 }
@@ -150,58 +143,6 @@ return {
    - Return `nil` to skip execution
    - Throw an error to stop the command chain (unless `continue_on_error` is true)
 
-### Command Chains
-
-Command chains allow executing multiple commands in sequence with advanced control flow:
-
-```lua
-cmd = {
-    "npm run clean",              -- Basic command
-    {
-        cmd = "npm test",         -- Command with options
-        continue_on_error = true  -- Continue chain even if this fails
-    },
-    {
-        cmd = "npm run build",    -- Conditional command
-        when = function()         -- Only runs if condition is true
-            return vim.fn.filereadable("package.json") == 1
-        end
-    },
-    {
-        cmd = "npm run deploy",   -- Always run command
-        always_run = true         -- Runs even if previous commands failed
-    }
-}
-```
-
-Command Chain Features:
-- `continue_on_error` - Continue executing chain even if this command fails
-- `when` - Conditional execution based on a function return value
-- `always_run` - Command runs regardless of previous command failures
-
-## Environment Variables
-
-Environment variables can be specified in two ways:
-
-### Static Values
-```lua
-env = {
-    NODE_ENV = "development",
-    PORT = "3000"
-}
-```
-
-### Dynamic Values
-```lua
-env = {
-    CURRENT_FILE = function()
-        return vim.fn.expand("%:p")
-    end,
-    GIT_BRANCH = function()
-        return vim.fn.system("git branch --show-current"):gsub("\n", "")
-    end
-}
-```
 
 ## Automatic Configuration Reloading
 
@@ -223,12 +164,8 @@ The plugin provides helpful error notifications in the following cases:
 | Option | Location | Type | Required | Description |
 |--------|----------|------|----------|-------------|
 | `name` | Command config | string | No | Display name in selection menu |
-| `cmd` | Command config | string \| function \| table | Yes | Command to execute |
+| `cmd` | Command config | string \| function | Yes | Command to execute |
 | `filetype` | Command config | string | No | Limit command to specific filetype |
-| `env` | Command config | table | No | Environment variables |
-| `continue_on_error` | Chain command | boolean | No | Continue chain if command fails |
-| `when` | Chain command | function | No | Condition for command execution |
-| `always_run` | Chain command | boolean | No | Run command even if chain has failed |
 | `default` | Root config | string | No | Default command ID |
 
 ## Example run.nvim.lua Files
@@ -238,17 +175,7 @@ The plugin provides helpful error notifications in the following cases:
 return {
     dev = {
         name = "Start Development Server",
-        cmd = {
-            {
-                cmd = "npm install",
-                continue_on_error = true
-            },
-            "npm run dev"
-        },
-        env = {
-            NODE_ENV = "development",
-            PORT = "3000"
-        }
+        cmd = "npm run dev"
     },
     
     test = {
@@ -266,22 +193,7 @@ return {
     
     build = {
         name = "Production Build",
-        cmd = {
-            "npm run clean",
-            {
-                cmd = "npm run lint",
-                continue_on_error = true
-            },
-            {
-                cmd = "npm run build",
-                when = function()
-                    return vim.fn.filereadable("package.json") == 1
-                end
-            }
-        },
-        env = {
-            NODE_ENV = "production"
-        }
+        cmd = "npm run build"
     },
     
     default = "dev"
@@ -293,17 +205,7 @@ return {
 return {
     build = {
         name = "Build Project",
-        cmd = {
-            "cargo clean",
-            {
-                cmd = "cargo fmt",
-                continue_on_error = true
-            },
-            "cargo build"
-        },
-        env = {
-            RUST_BACKTRACE = "1"
-        }
+        cmd = "cargo build"
     },
     
     test = {
@@ -325,15 +227,7 @@ return {
     
     doc = {
         name = "Generate Documentation",
-        cmd = {
-            "cargo doc",
-            {
-                cmd = ":!open target/doc/$(basename $(pwd))/index.html",
-                when = function()
-                    return vim.fn.has("mac") == 1
-                end
-            }
-        }
+        cmd = "cargo doc"
     },
     
     default = "run"

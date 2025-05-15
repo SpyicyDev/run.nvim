@@ -15,11 +15,9 @@ CONTENTS                                                           *run-contents
     6. Mappings ............................. |run-mappings|
     7. Project Configuration ................. |run-project-config|
     8. Command Types ......................... |run-command-types|
-    9. Environment Variables ................. |run-environment|
-    10. Command Chaining ..................... |run-command-chaining|
-    11. Automatic Reloading .................. |run-auto-reload|
-    12. Error Handling ....................... |run-error-handling|
-    13. API ................................. |run-api|
+    9. Automatic Reloading .................. |run-auto-reload|
+    10. Error Handling ....................... |run-error-handling|
+    11. API ................................. |run-api|
 
 ==============================================================================
 1. INTRODUCTION                                               *run-introduction*
@@ -107,10 +105,7 @@ Example configuration: >lua
         test = {
             name = "Run Tests",      -- Display name in selection menu
             cmd = "npm test",        -- Command to execute
-            filetype = "javascript", -- Optional, limit to specific filetype
-            env = {                  -- Optional environment variables
-                NODE_ENV = "test"
-            }
+            filetype = "javascript"  -- Optional, limit to specific filetype
         },
 
         -- Command with function
@@ -119,24 +114,6 @@ Example configuration: >lua
             cmd = function()
                 return "npm run build"
             end
-        },
-
-        -- Command chain
-        deploy = {
-            name = "Deploy",
-            cmd = {
-                "npm run build",
-                {
-                    cmd = "npm run test",
-                    continue_on_error = true
-                },
-                {
-                    cmd = "npm run deploy",
-                    when = function()
-                        return vim.fn.filereadable("dist/index.js") == 1
-                    end
-                }
-            }
         },
 
         -- Set default command
@@ -167,66 +144,7 @@ run.nvim supports three types of commands:
 <
 
 ==============================================================================
-9. ENVIRONMENT VARIABLES                                    *run-environment*
-
-Environment variables can be specified in command configurations:
-
-1. Static Values: >lua
-    env = {
-        NODE_ENV = "development",
-        PORT = "3000"
-    }
-<
-
-2. Dynamic Values: >lua
-    env = {
-        CURRENT_FILE = function()
-            return vim.fn.expand("%:p")
-        end
-    }
-<
-
-Special Variables:
-    %f              Expands to the current buffer's file path
-
-==============================================================================
-10. COMMAND CHAINING                                    *run-command-chaining*
-
-Commands can be chained with control flow options: >lua
-
-    cmd = {
-        -- Basic command
-        "npm run clean",
-
-        -- Command with error handling
-        {
-            cmd = "npm run build",
-            continue_on_error = true  -- Continue chain even if this fails
-        },
-
-        -- Conditional command
-        {
-            cmd = "npm run test",
-            when = function()         -- Only runs if condition is true
-                return vim.fn.filereadable("package.json") == 1
-            end
-        },
-
-        -- Always run command
-        {
-            cmd = "npm run deploy",
-            always_run = true         -- Runs even if previous commands failed
-        }
-    }
-<
-
-Chain Command Options:
-    continue_on_error    Continue chain even if this command fails
-    when                 Function that determines if command should run
-    always_run          Run command even if previous commands failed
-
-==============================================================================
-11. AUTOMATIC RELOADING                                    *run-auto-reload*
+9. AUTOMATIC RELOADING                                    *run-auto-reload*
 
 The plugin automatically reloads project configuration in these cases:
 
@@ -253,10 +171,6 @@ The plugin provides error notifications in these cases:
    - Command execution failures
    - Invalid command format
    - Missing required command fields
-
-3. Environment Errors
-   - Invalid environment variable format
-   - Failed dynamic environment variable evaluation
 
 All errors are displayed using Neovim's notification system with appropriate
 error levels and descriptive messages.
