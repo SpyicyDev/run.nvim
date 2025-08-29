@@ -16,7 +16,8 @@ A powerful and flexible command execution plugin for Neovim that makes running p
 ## Requirements
 
 - Neovim >= 0.8.0
-- [FTerm.nvim](https://github.com/numToStr/FTerm.nvim) (required for terminal command execution)
+- [FTerm.nvim](https://github.com/numToStr/FTerm.nvim) (recommended for enhanced terminal experience)
+  - If FTerm is not available, run.nvim will automatically fall back to built-in terminal functionality
 
 ## Installation
 
@@ -76,8 +77,14 @@ require('run').setup({
         run_proj = "<leader>rt", -- Show project commands menu
     },
     filetype = {
-        -- Shell command with file substitution (%f becomes the current file path)
+        -- Shell commands with file substitution patterns:
+        -- %f - Full file path          -- %d - Directory of the file
+        -- %n - Filename without ext    -- %e - File extension (no dot)
+        -- %t - Filename with extension (tail)
+        -- Environment variables: $VAR or ${VAR}
         python = "python3 %f",
+        c = "gcc %f -o %n && ./%n",  -- Compile and run
+        docker = "docker run -v %d:/app $DOCKER_IMAGE %f",  -- With env vars
         
         -- Vim command (prefixed with :)
         lua = ":luafile %f",
@@ -340,6 +347,10 @@ require('run').reload_proj()
 
 -- Set the default command from project configuration
 require('run').set_default()
+
+-- Preview command without executing (dry-run)
+require('run').preview_cmd()  -- Preview filetype command
+require('run').preview_cmd("test")  -- Preview specific project command
 ```
 
 ## Error Handling

@@ -82,6 +82,10 @@ Default configuration: >lua
                                                            *:RunReloadProj*
 :RunReloadProj          Reload the project configuration file.
 
+                                                              *:RunPreview*
+:RunPreview             Preview what command would be executed without actually
+                       running it. Useful for testing command configurations.
+
 ==============================================================================
 6. MAPPINGS                                                     *run-mappings*
 
@@ -141,6 +145,26 @@ run.nvim supports three types of commands:
    cmd = function()
        return "echo " .. vim.fn.expand("%")
    end
+<
+
+4. File Substitution Patterns                         *run-substitution-patterns*
+   Commands support several file path substitution patterns:
+   
+   %f - Full file path
+   %d - Directory of the file  
+   %n - Filename without extension
+   %e - File extension (without dot)
+   %t - Filename with extension (tail)
+   
+   Environment variable substitution:
+   $VAR or ${VAR} - Environment variable substitution
+   
+   Example usage: >lua
+   python = "python3 %f"           -- Run file with full path
+   compile = "gcc %f -o %n"        -- Compile to executable without extension
+   test = "pytest %d/test_%t"      -- Run test file in same directory
+   deploy = "$DEPLOY_SCRIPT %f"    -- Use environment variable
+   docker = "docker run -v %d:/app ${DOCKER_IMAGE}"  -- Mixed substitution
 <
 
 ==============================================================================
