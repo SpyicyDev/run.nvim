@@ -60,6 +60,11 @@ M.setup = function(opts)
             vim.api.nvim_create_user_command("RunReloadProj", function()
                 M.reload_proj()
             end, { desc = "Reload run.nvim.lua" })
+            
+            -- preview command
+            vim.api.nvim_create_user_command("RunPreview", function()
+                M.preview_cmd()
+            end, { desc = "Preview command without executing" })
         end
     })
 
@@ -337,6 +342,87 @@ end
 ---@return nil
 M.dump_proj = function()
     print(require("inspect").inspect(config.proj))
+end
+
+--- Preview what command would be executed without actually running it
+---@param cmd_section string|nil The command section to preview (nil for current filetype)
+---@return nil
+M.preview_cmd = function(cmd_section)
+    if cmd_section then
+        -- Preview project command
+        if not config.proj or not config.proj[cmd_section] then
+            utils.notify("Command section not found: " .. cmd_section, vim.log.levels.ERROR)
+            return
+        end
+        
+        local cmd_config = config.proj[cmd_section]
+        local cmd = cmd_config.cmd
+        
+        if type(cmd) == "function" then
+            local success, result = pcall(cmd)
+            if success then
+                cmd = result
+            else
+                utils.notify("Error in command function: " .. tostring(result), vim.log.levels.ERROR)
+                return
+            end
+        end
+        
+        if type(cmd) == "string" then
+            local formatted_cmd = utils.fmt_cmd(cmd)
+            if formatted_cmd then
+                utils.notify("Would execute: " .. formatted_cmd, vim.log.levels.INFO)
+            else
+                utils.notify("Command failed validation", vim.log.levels.ERROR)
+            end
+        else
+            utils.notify("Invalid command type", vim.log.levels.ERROR)
+        end
+    else
+        -- Preview filetype command
+        local buf = vim.api.nvim_buf_get_name(0)
+        if not buf then
+            utils.notify("No buffer name available", vim.log.levels.ERROR)
+            return
+        end
+
+        local ftype = vim.filetype.match({ filename = buf })
+        if not ftype then
+            utils.notify("Could not determine filetype", vim.log.levels.ERROR)
+            return
+        end
+
+        if not config.opts or not config.opts.filetype or not config.opts.filetype[ftype] then
+            utils.notify("No command configured for filetype: " .. ftype, vim.log.levels.ERROR)
+            return
+        end
+
+        local exec = config.opts.filetype[ftype]
+        local cmd = exec
+        
+        if type(exec) == "table" then
+            cmd = exec.cmd
+        elseif type(exec) == "function" then
+            local success, result = pcall(exec)
+            if success then
+                cmd = result
+            else
+                utils.notify("Error in command function: " .. tostring(result), vim.log.levels.ERROR)
+                return
+            end
+        end
+        
+        if type(cmd) == "string" then
+            local formatted_cmd = utils.fmt_cmd(cmd)
+            if formatted_cmd then
+                utils.notify("Would execute: " .. formatted_cmd, vim.log.levels.INFO)
+            else
+                utils.notify("Command failed validation", vim.log.levels.ERROR)
+            end
+        else
+            utils.notify("Invalid command type", vim.log.levels.ERROR)
+        end
+    end
 end
 
 return M

@@ -81,8 +81,10 @@ require('run').setup({
         -- %f - Full file path          -- %d - Directory of the file
         -- %n - Filename without ext    -- %e - File extension (no dot)
         -- %t - Filename with extension (tail)
+        -- Environment variables: $VAR or ${VAR}
         python = "python3 %f",
         c = "gcc %f -o %n && ./%n",  -- Compile and run
+        docker = "docker run -v %d:/app $DOCKER_IMAGE %f",  -- With env vars
         
         -- Vim command (prefixed with :)
         lua = ":luafile %f",
@@ -345,6 +347,10 @@ require('run').reload_proj()
 
 -- Set the default command from project configuration
 require('run').set_default()
+
+-- Preview command without executing (dry-run)
+require('run').preview_cmd()  -- Preview filetype command
+require('run').preview_cmd("test")  -- Preview specific project command
 ```
 
 ## Error Handling

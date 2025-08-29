@@ -37,6 +37,7 @@ end
 ---  %n - Filename without extension
 ---  %e - File extension (without dot)
 ---  %t - Filename with extension (tail)
+---  $VAR or ${VAR} - Environment variable substitution
 ---@param cmd string The command to process
 ---@return string|nil processed_cmd The processed command or nil if invalid
 local function preprocess_cmd(cmd)
@@ -45,38 +46,112 @@ local function preprocess_cmd(cmd)
     end
 
     -- Check if any substitution patterns are present
-    if not string.find(cmd, "%%[fdnet]") then
+    if not string.find(cmd, "%%[fdnet]") and not string.find(cmd, "%$") then
         return cmd
-    end
-
-    local buf_name = vim.api.nvim_buf_get_name(0)
-    if not buf_name or buf_name == "" then
-        M.notify("No buffer name available for path substitution", vim.log.levels.ERROR)
-        return nil
     end
 
     local processed = cmd
     
-    -- %f - Full file path
-    processed = string.gsub(processed, "%%f", buf_name)
+    -- Environment variable substitution first (before file patterns)
+    -- Handle ${VAR} format
+    processed = string.gsub(processed, "%${([%w_]+)}", function(var_name)
+        local env_value = vim.env[var_name] or os.getenv(var_name)
+        if env_value then
+            return env_value
+        else
+            M.notify("Environment variable $" .. var_name .. " is not set", vim.log.levels.WARN)
+            return "${" .. var_name .. "}"  -- Keep original if not found
+        end
+    end)
     
-    -- %d - Directory of the file
-    local directory = vim.fn.fnamemodify(buf_name, ":h")
-    processed = string.gsub(processed, "%%d", directory)
-    
-    -- %n - Filename without extension
-    local name_only = vim.fn.fnamemodify(buf_name, ":t:r")
-    processed = string.gsub(processed, "%%n", name_only)
-    
-    -- %e - File extension (without dot)
-    local extension = vim.fn.fnamemodify(buf_name, ":e")
-    processed = string.gsub(processed, "%%e", extension)
-    
-    -- %t - Filename with extension (tail)
-    local filename = vim.fn.fnamemodify(buf_name, ":t")
-    processed = string.gsub(processed, "%%t", filename)
+    -- Handle $VAR format (only word characters and underscores)
+    processed = string.gsub(processed, "%$([%w_]+)", function(var_name)
+        local env_value = vim.env[var_name] or os.getenv(var_name)
+        if env_value then
+            return env_value
+        else
+            M.notify("Environment variable $" .. var_name .. " is not set", vim.log.levels.WARN)
+            return "$" .. var_name  -- Keep original if not found
+        end
+    end)
+
+    -- File path substitutions (only if needed)
+    if string.find(processed, "%%[fdnet]") then
+        local buf_name = vim.api.nvim_buf_get_name(0)
+        if not buf_name or buf_name == "" then
+            M.notify("No buffer name available for path substitution", vim.log.levels.ERROR)
+            return nil
+        end
+
+        -- %f - Full file path
+        processed = string.gsub(processed, "%%f", buf_name)
+        
+        -- %d - Directory of the file
+        local directory = vim.fn.fnamemodify(buf_name, ":h")
+        processed = string.gsub(processed, "%%d", directory)
+        
+        -- %n - Filename without extension
+        local name_only = vim.fn.fnamemodify(buf_name, ":t:r")
+        processed = string.gsub(processed, "%%n", name_only)
+        
+        -- %e - File extension (without dot)
+        local extension = vim.fn.fnamemodify(buf_name, ":e")
+        processed = string.gsub(processed, "%%e", extension)
+        
+        -- %t - Filename with extension (tail)
+        local filename = vim.fn.fnamemodify(buf_name, ":t")
+        processed = string.gsub(processed, "%%t", filename)
+    end
     
     return processed
+end
+
+---Validate a command for potential issues before execution
+---@param cmd string The command to validate
+---@return boolean is_valid Whether the command passed validation
+---@return string|nil warning_msg Warning message if validation concerns exist
+local function validate_command_safety(cmd)
+    -- Check for obviously dangerous patterns
+    local dangerous_patterns = {
+        "rm%s+%-rf%s+/",      -- rm -rf /
+        "rm%s+%-rf%s+%*",     -- rm -rf *
+        ":%s*!%s*rm",         -- Vim command rm
+        "sudo%s+rm%s+%-rf",   -- sudo rm -rf
+    }
+    
+    for _, pattern in ipairs(dangerous_patterns) do
+        if string.find(cmd:lower(), pattern) then
+            return false, "Command contains potentially dangerous pattern: " .. pattern
+        end
+    end
+    
+    -- Check for unresolved substitutions (might indicate typos)
+    local unresolved_vars = {}
+    for var in string.gmatch(cmd, "%$([%w_]+)") do
+        if not vim.env[var] and not os.getenv(var) then
+            table.insert(unresolved_vars, var)
+        end
+    end
+    
+    local unresolved_file_patterns = {}
+    for pattern in string.gmatch(cmd, "(%%[fdnet])") do
+        table.insert(unresolved_file_patterns, pattern)
+    end
+    
+    local warnings = {}
+    if #unresolved_vars > 0 then
+        table.insert(warnings, "Unresolved environment variables: " .. table.concat(unresolved_vars, ", "))
+    end
+    if #unresolved_file_patterns > 0 then
+        table.insert(warnings, "Unresolved file patterns: " .. table.concat(unresolved_file_patterns, ", "))
+    end
+    
+    local warning_msg = nil
+    if #warnings > 0 then
+        warning_msg = table.concat(warnings, "; ")
+    end
+    
+    return true, warning_msg
 end
 
 ---Execute a Vim command in the current instance
@@ -133,6 +208,18 @@ end
 M.fmt_cmd = function(cmd)
     local ret_cmd = preprocess_cmd(cmd)
     if not ret_cmd then return nil end
+    
+    -- Validate command safety and warn about potential issues
+    local is_safe, warning = validate_command_safety(ret_cmd)
+    if not is_safe then
+        M.notify("Command validation failed: " .. warning, vim.log.levels.ERROR)
+        return nil
+    end
+    
+    if warning then
+        M.notify("Command warning: " .. warning, vim.log.levels.WARN)
+    end
+    
     return ret_cmd
 end
 
