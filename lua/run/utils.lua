@@ -1,6 +1,9 @@
 -- Consolidated utilities module for run.nvim
 local M = {}
 
+-- Cache frequently used modules
+local config = require("run.config")
+
 -- Notification utility
 ---Display a notification with the run.nvim title
 ---@param msg string The message to display
@@ -28,6 +31,12 @@ local function validate_cmd(cmd)
 end
 
 ---Process file path substitutions and validate command
+---Supports these substitution patterns:
+---  %f - Full file path
+---  %d - Directory of the file
+---  %n - Filename without extension
+---  %e - File extension (without dot)
+---  %t - Filename with extension (tail)
 ---@param cmd string The command to process
 ---@return string|nil processed_cmd The processed command or nil if invalid
 local function preprocess_cmd(cmd)
@@ -35,16 +44,39 @@ local function preprocess_cmd(cmd)
         return nil 
     end
 
-    if string.find(cmd, "%%f") then
-        local buf_name = vim.api.nvim_buf_get_name(0)
-        if not buf_name or buf_name == "" then
-            M.notify("No buffer name available for %f substitution", vim.log.levels.ERROR)
-            return nil
-        end
-        local processed = string.gsub(cmd, "%%f", buf_name)
-        return processed
+    -- Check if any substitution patterns are present
+    if not string.find(cmd, "%%[fdnet]") then
+        return cmd
     end
-    return cmd
+
+    local buf_name = vim.api.nvim_buf_get_name(0)
+    if not buf_name or buf_name == "" then
+        M.notify("No buffer name available for path substitution", vim.log.levels.ERROR)
+        return nil
+    end
+
+    local processed = cmd
+    
+    -- %f - Full file path
+    processed = string.gsub(processed, "%%f", buf_name)
+    
+    -- %d - Directory of the file
+    local directory = vim.fn.fnamemodify(buf_name, ":h")
+    processed = string.gsub(processed, "%%d", directory)
+    
+    -- %n - Filename without extension
+    local name_only = vim.fn.fnamemodify(buf_name, ":t:r")
+    processed = string.gsub(processed, "%%n", name_only)
+    
+    -- %e - File extension (without dot)
+    local extension = vim.fn.fnamemodify(buf_name, ":e")
+    processed = string.gsub(processed, "%%e", extension)
+    
+    -- %t - Filename with extension (tail)
+    local filename = vim.fn.fnamemodify(buf_name, ":t")
+    processed = string.gsub(processed, "%%t", filename)
+    
+    return processed
 end
 
 ---Execute a Vim command in the current instance
@@ -61,21 +93,31 @@ local function execute_vim_cmd(cmd)
     return true
 end
 
----Execute a shell command
+---Execute a shell command with fallback options
 ---@param cmd string The shell command to execute
 ---@return boolean success Whether the command started successfully
 local function execute_shell_cmd(cmd)
-    local term = require("FTerm")
-    if not term then
-        M.notify("FTerm not found. Make sure it's installed", vim.log.levels.ERROR)
-        return false
+    -- Try FTerm first (preferred terminal)
+    local has_fterm, fterm = pcall(require, "FTerm")
+    if has_fterm and fterm then
+        local success, err = pcall(fterm.scratch, { 
+            cmd = cmd,
+            auto_close = false -- Keep terminal open for visibility
+        })
+        
+        if success then
+            return true
+        else
+            M.notify("Error with FTerm: " .. tostring(err), vim.log.levels.WARN)
+        end
     end
     
-    -- Execute in a single terminal instance
-    local success, err = pcall(term.scratch, { 
-        cmd = cmd,
-        auto_close = false -- Keep terminal open for visibility
-    })
+    -- Fallback to vim.cmd terminal
+    M.notify("FTerm not available, using fallback terminal", vim.log.levels.INFO)
+    local success, err = pcall(function()
+        vim.cmd("tabnew")
+        vim.cmd("terminal " .. cmd)
+    end)
     
     if not success then
         M.notify("Error starting terminal command: " .. tostring(err), vim.log.levels.ERROR)
@@ -113,7 +155,6 @@ M.run_cmd = function(cmd_section)
         return false
     end
 
-    local config = require("run.config")
     if not config.proj or not config.proj[cmd_section] then
         M.notify("Command section not found in project configuration", vim.log.levels.ERROR)
         return false
@@ -152,7 +193,6 @@ end
 ---Write the current project configuration to the run.nvim.lua file
 ---@return nil
 M.write_conf = function()
-    local config = require("run.config")
     local proj_file = vim.fn.findfile("run.nvim.lua", ".;")
     if not proj_file or proj_file == "" then
         M.notify("Could not find run.nvim.lua file", vim.log.levels.ERROR)
