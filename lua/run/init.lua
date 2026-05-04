@@ -11,17 +11,22 @@ M.did_setup = false
 ---@param opts? run.UserConfig
 function M.setup(opts)
   if M.did_setup then return end
-  M.did_setup = true
 
   if vim.fn.has("nvim-0.10") == 0 then
     vim.notify("run.nvim requires Neovim 0.10 or newer", vim.log.levels.ERROR, { title = "run.nvim" })
+    -- Mark as setup-done: the version isn't going to change in this session, so
+    -- we don't want every subsequent ensure_setup() call to re-emit the notify.
+    M.did_setup = true
     return
   end
 
   local config = require("run.config")
   local ok, err = pcall(config.apply, opts)
   if not ok then
-    vim.notify(("run.nvim: invalid config: %s"):format(err), vim.log.levels.ERROR, { title = "run.nvim" })
+    vim.notify(("invalid config: %s"):format(err), vim.log.levels.ERROR, { title = "run.nvim" })
+    -- Leave did_setup = false so the user can correct their opts and re-call
+    -- setup({...}) without restarting nvim. Idempotency only applies to
+    -- successful setups; a failed validation is recoverable in-session.
     return
   end
 
@@ -48,6 +53,8 @@ function M.setup(opts)
     local project = require("run.project")
     if not project.did_initial_discover then project.discover() end
   end)
+
+  M.did_setup = true
 end
 
 ---Run the current file's filetype command, or fall back to project default
