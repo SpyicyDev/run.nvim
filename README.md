@@ -137,11 +137,32 @@ The top-level `default` (a string command id) is what `:Run` invokes when no men
 
 ### Trust
 
-`run.nvim.lua` executes arbitrary Lua, so by default run.nvim loads it via `vim.secure.read`, which prompts you the first time you encounter a given file (the same mechanism `:set exrc` uses). Trust decisions persist across sessions. To change behavior:
+`run.nvim.lua` executes arbitrary Lua, so by default run.nvim shows a single confirm prompt the first time you encounter a given file:
+
+```
+[run.nvim] Trust this project config and load it?
+
+  /abs/path/to/run.nvim.lua
+
+It contains executable Lua that runs in your Neovim.
+[T]rust & load, [S]kip, [V]iew first:
+```
+
+- **Trust & load** — loads it now, persists trust to `$XDG_STATE_HOME/nvim/trust` keyed by content hash. Edits invalidate trust *across sessions* but the in-session cache prevents re-prompts after every save.
+- **Skip** — returns nil, no project loaded for this session. Run `:RunReloadProj` to be prompted again.
+- **View first** — opens the file in a split for review. Run `:RunReloadProj` after to be prompted again.
+
+The on-disk format is identical to what `vim.secure.read` uses (the same trust DB), so files trusted by run.nvim are also trusted by `:set exrc` and vice versa.
+
+To change behavior:
 
 ```lua
 opts = { project = { trust = "prompt"|"always"|"never" } }
 ```
+
+- `prompt` (default) — show the confirm above.
+- `always` — load without prompting (UNSAFE; turns off the trust check).
+- `never` — never load any project file.
 
 ## Commands
 

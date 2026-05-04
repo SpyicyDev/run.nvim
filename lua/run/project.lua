@@ -77,13 +77,14 @@ local function file_sha256(path)
   return vim.fn.sha256(content)
 end
 
----Check whether vim.secure already trusts the file at `path` with its
----current content. Lets us skip the pre-prompt notification when no
----actual confirm dialog will appear.
-local function trusted_by_vim_secure(path)
-  local trust_db = vim.fn.stdpath("state") .. "/trust"
-  -- Read in binary mode so missing-file is silent (no user-facing notify).
-  local data = read_file_text(trust_db, "rb")
+---Path to Neovim's trust DB (same file vim.secure.read consults).
+local function trust_db_path() return vim.fn.stdpath("state") .. "/trust" end
+
+---Check whether the trust DB has a `<hash> <path>` entry for `path` whose
+---hash matches the file's current content. Lets us skip the prompt when
+---no confirm dialog would be needed.
+local function is_trusted(path)
+  local data = read_file_text(trust_db_path(), "rb")
   if not data then return false end
   local want = file_sha256(path)
   if not want then return false end
@@ -94,12 +95,49 @@ local function trusted_by_vim_secure(path)
   return false
 end
 
+---Add `<hash> <path>` to the trust DB (replacing any prior entry for the
+---same path). Same on-disk format vim.secure uses, so future
+---vim.secure.read calls on this file will short-circuit too.
+---@return boolean ok
+local function persist_trust(path)
+  local hash = file_sha256(path)
+  if not hash then return false end
+  local entries = {}
+  local existing = read_file_text(trust_db_path(), "rb") or ""
+  for line in existing:gmatch("[^\n]+") do
+    local _, p = line:match("^(%S+)%s+(.+)$")
+    if p ~= path then table.insert(entries, line) end
+  end
+  table.insert(entries, hash .. " " .. path)
+  vim.fn.mkdir(vim.fn.stdpath("state"), "p")
+  local fd, err = io.open(trust_db_path(), "w")
+  if not fd then
+    util.notify(("could not write trust DB: %s"):format(err), vim.log.levels.ERROR)
+    return false
+  end
+  fd:write(table.concat(entries, "\n") .. "\n")
+  fd:close()
+  return true
+end
+
 ---In-session trust cache: maps absolute project file path -> true once the
 ---user has approved it. Avoids re-prompting on BufWritePost / DirChanged
----within the same Neovim session, since vim.secure.read invalidates trust
----whenever file content changes. Cleared at next nvim restart, so the
----cross-session security guarantee of vim.secure is preserved.
+---within the same Neovim session, since the trust DB is keyed by file
+---content and any edit invalidates the entry. Cleared at next nvim restart,
+---so cross-session security is preserved.
 local _session_trusted = {}
+
+---Show our own trust confirm prompt — single dialog with full context,
+---routed through whatever UI is hooked (noice, dressing, raw vim).
+---@param path string
+---@return 1|2|3  1 = trust+load, 2 = skip, 3 = view first
+local function prompt_trust(path)
+  local msg = ("[run.nvim] Trust this project config and load it?\n\n  %s\n\nIt contains executable Lua that runs in your Neovim."):format(
+    path
+  )
+  local choice = vim.fn.confirm(msg, "&Trust && load\n&Skip\n&View first", 2)
+  return choice == 0 and 2 or choice
+end
 
 ---Read the project file source, respecting the trust setting.
 ---@param path string  absolute path
@@ -110,15 +148,22 @@ local function read_source(path)
   if trust == "always" then return read_file_text(path) end
 
   path = vim.fs.normalize(path)
-  if _session_trusted[path] or trusted_by_vim_secure(path) then
+  if _session_trusted[path] or is_trusted(path) then
     _session_trusted[path] = true
     return read_file_text(path)
   end
 
-  util.notify(("loading project config: %s\n(answer the trust prompt below)"):format(path), vim.log.levels.INFO)
-  local src = vim.secure.read(path)
-  if src then _session_trusted[path] = true end
-  return src
+  local choice = prompt_trust(path)
+  if choice == 1 then
+    persist_trust(path)
+    _session_trusted[path] = true
+    return read_file_text(path)
+  end
+  if choice == 3 then
+    vim.cmd("split " .. vim.fn.fnameescape(path))
+    util.notify("review the file, then run :RunReloadProj to be prompted again", vim.log.levels.INFO)
+  end
+  return nil
 end
 
 ---@return string  absolute path to defaults.json

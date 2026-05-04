@@ -158,85 +158,114 @@ return {
     end)
   end)
 
-  describe("in-session trust cache", function()
-    it("does not re-prompt on second discover within same session", function()
+  describe("trust prompt", function()
+    -- Every test in this block must restore vim.fn.confirm even if the assertion
+    -- inside throws — otherwise a stub leaks into the next test.
+    local function with_confirm_stub(stub, fn)
+      local original = vim.fn.confirm
+      vim.fn.confirm = stub
+      local ok, err = pcall(fn)
+      vim.fn.confirm = original
+      if not ok then error(err) end
+    end
+
+    it("'Trust && load' (choice 1) loads file and writes hash to trust DB", function()
       local dir = make_project([[return { x = { name = "X", cmd = "x" } }]])
-
-      local secure_calls = 0
-      local original = vim.secure.read
-      vim.secure.read = function(p)
-        secure_calls = secure_calls + 1
-        local fd = io.open(p, "r")
-        local s = fd:read("*a")
-        fd:close()
-        return s
-      end
-
-      helpers.setup_sync({ project = { trust = "prompt" } })
+      local _, restore = helpers.hijack_state(dir)
+      with_confirm_stub(function() return 1 end, function() helpers.setup_sync({ project = { trust = "prompt" } }) end)
+      restore()
       assert.is_true(require("run.project").has_project())
-      assert.equals(1, secure_calls)
-
-      require("run.project").discover()
-      require("run.project").discover()
-      vim.secure.read = original
-      assert.equals(1, secure_calls, "second/third discover should hit session cache, not re-prompt")
+      local trust_db = vim.fs.normalize(dir .. "/state/trust")
+      local content = helpers.read(trust_db) or ""
+      assert.is_truthy(content:find("run.nvim.lua", 1, true), "trust DB should record the project file path")
     end)
 
-    it("does NOT emit pre-prompt notify when vim.secure already trusts the file", function()
+    it("'Skip' (choice 2) returns nil and leaves no project loaded", function()
       make_project([[return { x = { name = "X", cmd = "x" } }]])
+      with_confirm_stub(function() return 2 end, function() helpers.setup_sync({ project = { trust = "prompt" } }) end)
+      assert.is_false(require("run.project").has_project())
+    end)
 
-      -- Pre-trust the file by writing its hash into the trust DB ourselves.
-      -- Use the same path normalization the plugin uses (post-cwd realpath).
+    it("ESC / cancel (choice 0) is treated as Skip", function()
+      make_project([[return { x = { name = "X", cmd = "x" } }]])
+      with_confirm_stub(function() return 0 end, function() helpers.setup_sync({ project = { trust = "prompt" } }) end)
+      assert.is_false(require("run.project").has_project())
+    end)
+
+    it("'View first' (choice 3) opens file in split, returns nil, notifies how to retry", function()
+      local dir = make_project([[return { x = { name = "X", cmd = "x" } }]])
+      local notes
+      with_confirm_stub(function() return 3 end, function()
+        notes = helpers.capture_notify(function() helpers.setup_sync({ project = { trust = "prompt" } }) end)
+      end)
+      assert.is_false(require("run.project").has_project())
+      assert.is_not_nil(helpers.find_notify(notes, "RunReloadProj"), "should advise how to re-trigger")
+      local found_split = false
+      for _, b in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_get_name(b):find("run.nvim.lua", 1, true) then
+          found_split = true
+          break
+        end
+      end
+      assert.is_true(found_split, "the project file should be opened for review")
+    end)
+
+    it("trusted file (entry exists in trust DB) skips prompt entirely", function()
+      local dir = make_project([[return { x = { name = "X", cmd = "x" } }]])
+      local _, restore = helpers.hijack_state(dir)
+
+      -- Pre-trust the file using the same on-disk format the plugin uses.
       local proj = vim.fs.normalize(vim.fn.getcwd() .. "/run.nvim.lua")
-      local content = (function()
-        local fd = io.open(proj, "rb")
-        local s = fd:read("*a")
-        fd:close()
-        return s
-      end)()
+      local fd = io.open(proj, "rb")
+      local content = fd:read("*a")
+      fd:close()
       local hash = vim.fn.sha256(content)
-      local trust_dir = vim.fn.stdpath("state")
-      vim.fn.mkdir(trust_dir, "p")
-      local tfd = io.open(trust_dir .. "/trust", "w")
+      local state_dir = vim.fn.stdpath("state")
+      vim.fn.mkdir(state_dir, "p")
+      local tfd = io.open(state_dir .. "/trust", "w")
       tfd:write(hash .. " " .. proj .. "\n")
       tfd:close()
 
-      local original = vim.secure.read
-      vim.secure.read = function() error("should not be called when already trusted") end
-      local ok, result = pcall(
-        helpers.capture_notify,
+      with_confirm_stub(
+        function() error("should not prompt when already trusted") end,
         function() helpers.setup_sync({ project = { trust = "prompt" } }) end
       )
-      vim.secure.read = original
-      vim.fn.delete(trust_dir .. "/trust")
-
-      assert.is_true(ok, "vim.secure.read was incorrectly called: " .. tostring(result))
+      restore()
       assert.is_true(require("run.project").has_project())
-      assert.is_nil(
-        helpers.find_notify(result, "loading project config"),
-        "no pre-prompt notify should fire when vim.secure already trusts the file"
-      )
     end)
 
-    it("invalidates cache by content change is bypassed within session (intentional)", function()
+    it("after Trust+load, second discover within session does not re-prompt", function()
+      local dir = make_project([[return { x = { name = "X", cmd = "x" } }]])
+      local _, restore = helpers.hijack_state(dir)
+
+      local prompts = 0
+      with_confirm_stub(function()
+        prompts = prompts + 1
+        return 1
+      end, function()
+        helpers.setup_sync({ project = { trust = "prompt" } })
+        require("run.project").discover()
+        require("run.project").discover()
+      end)
+      restore()
+      assert.equals(1, prompts, "session cache + persisted DB hash should both prevent re-prompt")
+    end)
+
+    it("after Trust+load, content edits within session bypass re-prompt (session cache)", function()
       local dir = make_project([[return { v1 = { name = "V1", cmd = "x" } }]])
+      local _, restore = helpers.hijack_state(dir)
 
-      local original = vim.secure.read
-      vim.secure.read = function(p)
-        local fd = io.open(p, "r")
-        local s = fd:read("*a")
-        fd:close()
-        return s
-      end
-
-      helpers.setup_sync({ project = { trust = "prompt" } })
-
-      helpers.write(dir .. "/run.nvim.lua", [[return { v2 = { name = "V2", cmd = "x" } }]])
-
-      vim.secure.read = function() error("should not be called: cached trust within session") end
-      require("run.project").discover()
-      vim.secure.read = original
-
+      local prompts = 0
+      with_confirm_stub(function()
+        prompts = prompts + 1
+        return 1
+      end, function()
+        helpers.setup_sync({ project = { trust = "prompt" } })
+        helpers.write(dir .. "/run.nvim.lua", [[return { v2 = { name = "V2", cmd = "x" } }]])
+        require("run.project").discover()
+      end)
+      restore()
+      assert.equals(1, prompts, "edits within session reuse session cache, no re-prompt")
       assert.is_not_nil(require("run.project").commands().v2)
     end)
   end)

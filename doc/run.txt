@@ -280,13 +280,30 @@ translated for the other adapters):
 ==============================================================================
 12. PROJECT TRUST                                         *run-project-trust*
 
-Loading `run.nvim.lua` executes arbitrary Lua. By default, run.nvim uses
-|vim.secure.read()| to prompt for trust the first time you encounter a given
-project file. Trust decisions are persisted (see `:help vim.secure`).
+Loading `run.nvim.lua` executes arbitrary Lua. By default, run.nvim shows a
+single |confirm()| dialog the first time you encounter a given project file:
 
-    project.trust = "prompt"   default; prompt once per file
-    project.trust = "always"   always load without prompting (UNSAFE)
-    project.trust = "never"    never load any project file
+    [run.nvim] Trust this project config and load it?
+
+      /abs/path/to/run.nvim.lua
+
+    It contains executable Lua that runs in your Neovim.
+    [T]rust & load, [S]kip, [V]iew first:
+
+  Trust & load:  load now; persist trust to $XDG_STATE_HOME/nvim/trust
+                 (the same DB |vim.secure.read()| uses) keyed by content
+                 hash. Subsequent sessions skip the prompt.
+  Skip:          do not load this session. Use |:RunReloadProj| to retry.
+  View first:    open the file in a split for review. Use |:RunReloadProj|
+                 to retry once you've inspected it.
+
+Edits invalidate the on-disk trust entry across sessions (since the hash
+changes), but an in-session cache prevents re-prompting on every save
+within the same Neovim run.
+
+  project.trust = "prompt"   default; show the confirm above
+  project.trust = "always"   load without prompting (UNSAFE)
+  project.trust = "never"    never load any project file
 
 ==============================================================================
 13. AUTO-RELOAD                                              *run-auto-reload*
