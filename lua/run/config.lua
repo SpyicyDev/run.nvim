@@ -1,58 +1,93 @@
--- Configuration module for run.nvim
-local config = {
-    opts = {},
-    proj = {},
-    proj_file_exists = false
+---@class run.TerminalConfig
+---@field backend? "auto"|"builtin"|"snacks"|"toggleterm"|"fterm"
+---@field position? "float"|"bottom"|"top"|"left"|"right"|"tab"
+---@field size? integer
+---@field close_on_exit? boolean
+
+---@class run.ProjectConfig
+---@field trust? "prompt"|"always"|"never"
+---@field filename? string
+
+---@class run.UserConfig
+---@field filetype? table<string, string|fun():string?|run.CommandSpec>
+---@field terminal? run.TerminalConfig
+---@field project? run.ProjectConfig
+---@field notify? boolean
+
+---@class run.CommandSpec
+---@field name? string
+---@field cmd string|fun():string?
+---@field filetype? string
+
+local M = {}
+
+---@type run.UserConfig
+M.defaults = {
+  filetype = {},
+  terminal = {
+    backend = "auto",
+    position = "bottom",
+    size = 15,
+    close_on_exit = false,
+  },
+  project = {
+    trust = "prompt",
+    filename = "run.nvim.lua",
+  },
+  notify = true,
 }
 
--- Default configuration values
-local defaults = {
-    keys = {
-        run = "<leader>rr",
-        run_proj = "<leader>rt",
+---Active, fully-merged configuration. Re-assigned by `apply()`.
+---@type run.UserConfig
+M.values = vim.deepcopy(M.defaults)
+
+local VALID_BACKENDS = { auto = true, builtin = true, snacks = true, toggleterm = true, fterm = true }
+local VALID_POSITIONS = { float = true, bottom = true, top = true, left = true, right = true, tab = true }
+local VALID_TRUST = { prompt = true, always = true, never = true }
+
+local function _validate(c)
+  vim.validate({
+    filetype = { c.filetype, "table" },
+    terminal = { c.terminal, "table" },
+    project = { c.project, "table" },
+    notify = { c.notify, "boolean" },
+  })
+  vim.validate({
+    ["terminal.backend"] = {
+      c.terminal.backend,
+      function(v) return VALID_BACKENDS[v] == true end,
+      "auto|builtin|snacks|toggleterm|fterm",
     },
-    filetype = {}
-}
-
----Validate the configuration options
----@param opts table The configuration options to validate
----@return nil
----@error string Error message if validation fails
-local function validate_config(opts)
-    if opts.keys and type(opts.keys) ~= "table" then
-        error("keys configuration must be a table")
-    end
-    
-    if opts.filetype and type(opts.filetype) ~= "table" then
-        error("filetype configuration must be a table")
-    end
+    ["terminal.position"] = {
+      c.terminal.position,
+      function(v) return VALID_POSITIONS[v] == true end,
+      "float|bottom|top|left|right|tab",
+    },
+    ["terminal.size"] = { c.terminal.size, "number" },
+    ["terminal.close_on_exit"] = { c.terminal.close_on_exit, "boolean" },
+    ["project.trust"] = {
+      c.project.trust,
+      function(v) return VALID_TRUST[v] == true end,
+      "prompt|always|never",
+    },
+    ["project.filename"] = { c.project.filename, "string" },
+  })
 end
 
----Setup the configuration with user options
----@param opts table|nil User configuration options
----@return nil
-function config.setup(opts)
-    opts = opts or {}
-    validate_config(opts)
-    config.opts = vim.tbl_deep_extend("force", defaults, opts)
+---Merge user opts into defaults and validate.
+---@param opts? run.UserConfig
+function M.apply(opts)
+  M.values = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts or {})
+  _validate(M.values)
 end
 
----Load and validate project configuration from run.nvim.lua
----@param proj_config table The project configuration from run.nvim.lua
----@return boolean success Whether the configuration was loaded successfully
----@return string|nil error_message Error message if loading failed
-function config.load_proj_config(proj_config)
-    -- Validation is now done in utils.lua
-    local utils = require("run.utils")
-    local is_valid, error_msg = utils.validate_config(proj_config)
-    if not is_valid then
-        return false, error_msg
-    end
-
-    -- Configuration is valid, store it
-    config.proj = proj_config
-    config.proj_file_exists = true
-    return true, nil
+---Lazy-bootstrap: if `setup()` was never called, run it with defaults.
+---Lets users skip `setup({})` entirely and still hit the public API.
+function M.ensure_setup()
+  local run = require("run")
+  if not run.did_setup then
+    run.setup({})
+  end
 end
 
-return config
+return M

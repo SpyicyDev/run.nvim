@@ -1,225 +1,337 @@
-*run*  A powerful and flexible command execution plugin for Neovim
+*run.txt*    A small, opinionated command runner for Neovim
+*run* *run.nvim*
 
 Author:   SpyicyDev
 License:  MIT
-Version:  1.0.0
 
 ==============================================================================
-CONTENTS                                                           *run-contents*
+CONTENTS                                                          *run-contents*
 
-    1. Introduction .......................... |run-introduction|
-    2. Requirements .......................... |run-requirements|
-    3. Installation .......................... |run-installation|
-    4. Configuration ......................... |run-configuration|
-    5. Commands .............................. |run-commands|
-    6. Mappings ............................. |run-mappings|
-    7. Project Configuration ................. |run-project-config|
-    8. Command Types ......................... |run-command-types|
-    9. Automatic Reloading .................. |run-auto-reload|
-    10. Error Handling ....................... |run-error-handling|
-    11. API ................................. |run-api|
+  1. Introduction ........................................ |run-introduction|
+  2. Requirements ........................................ |run-requirements|
+  3. Installation ........................................ |run-installation|
+  4. Configuration ...................................... |run-configuration|
+  5. Commands ............................................... |run-commands|
+  6. Keymaps ................................................ |run-keymaps|
+  7. Project configuration ............................. |run-project-config|
+  8. Command types ..................................... |run-command-types|
+  9. Substitutions ......................................... |run-substitutions|
+ 10. Safety check ......................................... |run-safety|
+ 11. Terminal backends .............................. |run-terminal-backends|
+ 12. Project trust ...................................... |run-project-trust|
+ 13. Auto-reload ........................................ |run-auto-reload|
+ 14. Health check ........................................... |run-health|
+ 15. API ...................................................... |run-api|
 
 ==============================================================================
-1. INTRODUCTION                                               *run-introduction*
+1. INTRODUCTION                                              *run-introduction*
 
-run.nvim is a powerful and flexible command execution plugin for Neovim that
-makes running project commands a breeze. Execute shell commands, Vim commands,
-and Lua functions with ease, all while maintaining project-specific
-configurations.
+run.nvim runs filetype-default commands or per-project commands declared in a
+`run.nvim.lua` file at the project root. Commands can be shell snippets, Vim
+commands (prefixed with `:`), or Lua functions returning either of those.
+
+Shell commands are dispatched to a configurable terminal backend; the default
+uses Neovim's built-in `:terminal`, with optional adapters for snacks.nvim,
+toggleterm.nvim, and FTerm.nvim.
 
 ==============================================================================
 2. REQUIREMENTS                                              *run-requirements*
 
-- Neovim >= 0.8.0
-- FTerm.nvim (required for terminal command execution)
+- Neovim >= 0.10
+- Optional terminal backend: snacks.nvim, toggleterm.nvim, or FTerm.nvim
+
+If none of the optional backends is installed, run.nvim uses Neovim's built-in
+terminal in a horizontal split.
 
 ==============================================================================
-3. INSTALLATION                                             *run-installation*
+3. INSTALLATION                                              *run-installation*
 
-Using lazy.nvim: >lua
+With lazy.nvim ~
+>lua
     {
-        'SpyicyDev/run.nvim',
-        dependencies = {
-            'numToStr/FTerm.nvim', -- Required for terminal commands
-        },
-        config = function()
-            require('run').setup({
-                -- your configuration here
-            })
-        end
+      "SpyicyDev/run.nvim",
+      cmd = { "Run", "RunProj", "RunSetDefault", "RunReloadProj" },
+      keys = {
+        { "<leader>rr", "<cmd>Run<cr>",     desc = "Run" },
+        { "<leader>rt", "<cmd>RunProj<cr>", desc = "Run project command" },
+      },
+      opts = {},
     }
 <
 
-==============================================================================
-4. CONFIGURATION                                           *run-configuration*
+The plugin is fully usable with `opts = {}` (or no `opts` at all). All user
+commands are registered eagerly via `plugin/run.lua`, so they are available
+even before the first call.
 
-Default configuration: >lua
-    require('run').setup({
-        keys = {
-            run = "<leader>rr",      -- Run current file or project command
-            run_proj = "<leader>rt", -- Show project commands menu
-        },
-        filetype = {
-            -- Filetype-specific commands
-            -- Example:
-            -- python = "python3 %f",
-            -- javascript = "node %f",
-        }
+==============================================================================
+4. CONFIGURATION                                            *run-configuration*
+
+Defaults: ~
+>lua
+    require("run").setup({
+      filetype = {},                          -- ft -> string|fn|{cmd=...}
+      terminal = {
+        backend = "auto",                     -- auto|builtin|snacks|toggleterm|fterm
+        position = "bottom",                  -- bottom|top|left|right|float|tab
+        size = 15,                            -- rows for h-splits, cols for v-splits
+        close_on_exit = false,                -- close window when shell exits 0
+      },
+      project = {
+        trust = "prompt",                     -- prompt|always|never
+        filename = "run.nvim.lua",            -- file to look for in cwd ancestors
+      },
+      notify = true,                          -- set false to silence vim.notify
+    })
+<
+
+Example with filetype commands: ~
+>lua
+    require("run").setup({
+      filetype = {
+        python     = "python3 %f",
+        javascript = "node %f",
+        lua        = ":luafile %",
+        rust       = { cmd = "cargo run" },
+        c          = "gcc -o %:r %f && ./%:r",
+      },
     })
 <
 
 ==============================================================================
-5. COMMANDS                                                     *run-commands*
+5. COMMANDS                                                      *run-commands*
 
-                                                                      *:Run*
-:Run                    Run the current file's filetype command or project
-                       command based on context.
+                                                                        *:Run*
+:Run                    If a `run.nvim.lua` is loaded and a default is set,
+                        runs the default. If a project is loaded but no
+                        default, opens the project menu. Otherwise runs the
+                        configured filetype command.
 
-                                                            *:RunSetDefault*
-:RunSetDefault          Set a default command from the project configuration.
-                       Only available when a project config file exists.
+                                                                    *:RunProj*
+:RunProj                Open the project command menu (also offers to run the
+                        current filetype command if configured).
 
-                                                           *:RunReloadProj*
-:RunReloadProj          Reload the project configuration file.
+                                                              *:RunSetDefault*
+:RunSetDefault          Pick a default command for the current project. The
+                        choice is persisted to `stdpath('state')/run.nvim/`
+                        — your `run.nvim.lua` file is never modified.
 
-                                                              *:RunPreview*
-:RunPreview             Preview what command would be executed without actually
-                       running it. Useful for testing command configurations.
+                                                             *:RunReloadProj*
+:RunReloadProj          Re-read `run.nvim.lua` from disk.
+
+                                                                 *:RunPreview*
+:RunPreview [{cmd_id}]  Resolve and expand the command but do NOT execute it;
+                        report the final shell/vim string via |vim.notify()|.
+                        With no argument, previews the current filetype
+                        command. With an argument, previews the named project
+                        command (tab-completion supported).
 
 ==============================================================================
-6. MAPPINGS                                                     *run-mappings*
+6. KEYMAPS                                                       *run-keymaps*
 
-Default key mappings (can be customized in setup):
-
-<leader>rr              Run the current file or project command
-<leader>rt              Open project commands menu (only when project config exists)
-
-Note: All mappings are buffer-local and only set when keys are configured.
+run.nvim does **not** create any keymaps. Bind them yourself, e.g. via the
+lazy.nvim `keys` spec (see |run-installation|) or:
+>lua
+    vim.keymap.set("n", "<leader>rr", "<cmd>Run<cr>",     { desc = "Run" })
+    vim.keymap.set("n", "<leader>rt", "<cmd>RunProj<cr>", { desc = "Run proj" })
+<
 
 ==============================================================================
 7. PROJECT CONFIGURATION                                  *run-project-config*
 
-Project-specific configuration is stored in a `run.nvim.lua` file in your
-project root. The file should return a table with command configurations.
-
-Example configuration: >lua
-
+Place a `run.nvim.lua` file in your project root (or any ancestor of cwd).
+The file must `return` a table whose entries are command specs:
+>lua
     return {
-        -- Basic command configuration
-        test = {
-            name = "Run Tests",      -- Display name in selection menu
-            cmd = "npm test",        -- Command to execute
-            filetype = "javascript"  -- Optional, limit to specific filetype
-        },
-
-        -- Command with function
-        build = {
-            name = "Build Project",
-            cmd = function()
-                return "npm run build"
-            end
-        },
-
-        -- Set default command
-        default = "test"
+      dev = {
+        name = "Start dev server",
+        cmd  = "npm run dev",
+      },
+      test = {
+        name = "Run tests for this file",
+        cmd  = function()
+          local file = vim.fn.expand("%:p")
+          if file:match("%.test%.ts$") then
+            return "npm test -- " .. file
+          end
+          return "npm test"
+        end,
+        filetype = "typescript",          -- only listed for typescript buffers
+      },
+      default = "dev",                    -- :Run will pick this when set
     }
 <
 
-==============================================================================
-8. COMMAND TYPES                                           *run-command-types*
+Schema per command entry: ~
+    name      string   required, shown in the picker
+    cmd       string|function  required, see |run-command-types|
+    filetype  string?  if set, the command is only listed when the current
+                       buffer matches this filetype
 
-run.nvim supports three types of commands:
-
-1. Shell Commands                                    *run-shell-commands*
-   Regular shell commands executed in FTerm: >lua
-   cmd = "npm test"
-<
-
-2. Vim Commands                                        *run-vim-commands*
-   Vim commands (prefixed with ":") executed directly: >lua
-   cmd = ":write | source %"
-<
-
-3. Lua Functions                                      *run-lua-commands*
-   Functions that return a command string: >lua
-   cmd = function()
-       return "echo " .. vim.fn.expand("%")
-   end
-<
-
-4. File Substitution Patterns                         *run-substitution-patterns*
-   Commands support several file path substitution patterns:
-   
-   %f - Full file path
-   %d - Directory of the file  
-   %n - Filename without extension
-   %e - File extension (without dot)
-   %t - Filename with extension (tail)
-   
-   Environment variable substitution:
-   $VAR or ${VAR} - Environment variable substitution
-   
-   Example usage: >lua
-   python = "python3 %f"           -- Run file with full path
-   compile = "gcc %f -o %n"        -- Compile to executable without extension
-   test = "pytest %d/test_%t"      -- Run test file in same directory
-   deploy = "$DEPLOY_SCRIPT %f"    -- Use environment variable
-   docker = "docker run -v %d:/app ${DOCKER_IMAGE}"  -- Mixed substitution
-<
+The top-level `default` key (a string) selects which command `:Run` invokes
+when no menu is shown. It can be overridden via |:RunSetDefault|.
 
 ==============================================================================
-9. AUTOMATIC RELOADING                                    *run-auto-reload*
+8. COMMAND TYPES                                            *run-command-types*
 
-The plugin automatically reloads project configuration in these cases:
+Shell ~
+    cmd = "npm test"
+    cmd = "make build && ./out"
 
-1. Directory Changes
-   Configuration is reloaded when changing directories using :cd, :lcd, etc.
+    Sent to the configured terminal backend (see |run-terminal-backends|).
 
-2. File Changes
-   Configuration is reloaded when saving the run.nvim.lua file.
+Vim ~
+    cmd = ":write | source %"
 
-3. Manual Reload
-   Configuration can be reloaded using :RunReloadProj command.
+    Strings starting with `:` are executed via |vim.cmd()|.
 
-==============================================================================
-12. ERROR HANDLING                                      *run-error-handling*
+Function ~
+    cmd = function()
+      if vim.fn.filereadable("Cargo.toml") == 1 then
+        return "cargo run"
+      end
+      return nil   -- nothing to do
+    end
 
-The plugin provides error notifications in these cases:
+    Functions are called at run time and may return:
+      • a shell command string
+      • a Vim command string (prefixed with `:`)
+      • `nil` to skip execution silently (treated as success)
 
-1. Configuration Errors
-   - Missing key configuration
-   - Invalid project configuration format
-   - Project configuration file loading errors
-
-2. Command Errors
-   - Command execution failures
-   - Invalid command format
-   - Missing required command fields
-
-All errors are displayed using Neovim's notification system with appropriate
-error levels and descriptive messages.
+    Errors raised inside the function are caught and reported via
+    |vim.notify()|.
 
 ==============================================================================
-13. API                                                          *run-api*
+9. SUBSTITUTIONS                                          *run-substitutions*
 
-run.nvim provides a Lua API for programmatic control:
+Before execution, command strings are processed in two passes:
 
-setup({opts})                                                  *run.setup()*
-    Initialize the plugin with configuration options.
-    Parameters: ~
-        {opts}    Configuration table (see |run-configuration|)
+  1. Environment variable substitution
+  2. File path placeholder substitution
 
-run()                                                           *run.run()*
-    Run the current file or project command.
+Environment variables ~
 
-run_proj()                                                 *run.run_proj()*
-    Show the project commands menu (only when project config exists).
+    $VAR       value of `VAR` from `vim.env` (falls back to `os.getenv`)
+    ${VAR}     same; explicit braces
 
-reload_proj()                                           *run.reload_proj()*
-    Reload the project configuration file.
+If a referenced variable is unset, run.nvim emits a |vim.notify()| warning
+and leaves the literal text in place so that the shell can decide what to do.
 
-set_default()                                           *run.set_default()*
-    Set the default command from project configuration.
-    Only available when project config exists.
+File path placeholders ~
 
- vim:tw=78:ts=8:ft=help:norl:
+    %f         absolute buffer path
+    %d         directory of the buffer file (`:h` modifier)
+    %n         basename without extension (`:t:r`)
+    %e         extension, no leading dot (`:e`)
+    %t         basename with extension (`:t`)
+
+If the buffer is unnamed and any %[fdnet] pattern is used, run.nvim
+errors out (no silent fallback). Vim commands (those starting with `:`)
+have these substitutions applied before being passed to |vim.cmd()|.
+
+Examples: >lua
+
+    python = "python3 %f"
+    c      = "gcc -o %n %f && ./%n"
+    docker = "docker run -v %d:/app ${DOCKER_IMAGE}"
+    deploy = "$DEPLOY_SCRIPT %f"
+<
+
+==============================================================================
+10. SAFETY CHECK                                                  *run-safety*
+
+Before sending to a terminal, run.nvim refuses to execute commands matching
+obviously-destructive patterns:
+
+    rm -rf /
+    rm -rf *
+    :!rm ...           (Vim shell-out form)
+    sudo rm -rf ...
+
+If a command matches, the user is notified at ERROR level and execution is
+aborted. Use |:RunPreview| to inspect what would run if you're unsure about
+a command (especially one that uses environment variables or function specs).
+
+==============================================================================
+11. TERMINAL BACKENDS                                  *run-terminal-backends*
+
+Configured via `terminal.backend`:
+
+    "auto"        try snacks → toggleterm → FTerm; fall back to builtin
+    "builtin"     Neovim's :terminal in a split or float
+    "snacks"      snacks.nvim's snacks.terminal()
+    "toggleterm"  toggleterm.nvim's exec()
+    "fterm"       FTerm.nvim's scratch()
+
+If you select a backend whose plugin isn't installed, run.nvim warns once and
+falls back to the built-in terminal.
+
+`terminal.position` controls the built-in backend (and is best-effort
+translated for the other adapters):
+
+    "bottom"   |botright| horizontal split
+    "top"      |topleft| horizontal split
+    "left"     |topleft| vertical split
+    "right"    |botright| vertical split
+    "float"    centered floating window
+    "tab"      new tab page
+
+`terminal.size` is rows for horizontal splits, cols for vertical splits.
+
+==============================================================================
+12. PROJECT TRUST                                         *run-project-trust*
+
+Loading `run.nvim.lua` executes arbitrary Lua. By default, run.nvim uses
+|vim.secure.read()| to prompt for trust the first time you encounter a given
+project file. Trust decisions are persisted (see `:help vim.secure`).
+
+    project.trust = "prompt"   default; prompt once per file
+    project.trust = "always"   always load without prompting (UNSAFE)
+    project.trust = "never"    never load any project file
+
+==============================================================================
+13. AUTO-RELOAD                                              *run-auto-reload*
+
+Project configuration is reloaded automatically:
+  - on |DirChanged| (e.g. after `:cd`)
+  - on |BufWritePost| of the project filename
+  - manually via |:RunReloadProj|
+
+==============================================================================
+14. HEALTH CHECK                                                  *run-health*
+
+Run `:checkhealth run` to inspect:
+  - Neovim version
+  - Whether `setup()` has been called
+  - Which terminal backends are available
+  - Currently loaded project file (if any)
+
+==============================================================================
+15. API                                                              *run-api*
+
+require("run").setup({opts})                                  *run.setup()*
+    Initialize run.nvim. Idempotent — safe to call multiple times.
+
+require("run").run()                                            *run.run()*
+    Top-level dispatch (default → menu → filetype command).
+
+require("run").run_proj()                                  *run.run_proj()*
+    Open the project command menu.
+
+require("run").run_proj_default()              *run.run_proj_default()*
+    Run the project's persisted default command.
+
+require("run").run_file()                                  *run.run_file()*
+    Run the configured command for the current buffer's filetype.
+
+require("run").reload_proj()                            *run.reload_proj()*
+    Re-read `run.nvim.lua` from disk.
+
+require("run").set_default()                            *run.set_default()*
+    Open the "set default" picker for the current project.
+
+require("run").preview_cmd({cmd_id?})                  *run.preview_cmd()*
+    Resolve the named project command (or, if {cmd_id} is omitted, the
+    current filetype command), apply env-var and path expansion, and
+    report the final command via |vim.notify()|. Does not execute.
+
+ vim:tw=78:ts=8:sts=2:sw=2:ft=help:norl:

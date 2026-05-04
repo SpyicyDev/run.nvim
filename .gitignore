@@ -23,7 +23,8 @@ Icon
 
 # Project specific
 test/temp/
-.luarc.json
 .luacheckcache
 .luacov
 .luacov.report.out
+.sisyphus/
+
