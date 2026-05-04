@@ -158,6 +158,53 @@ return {
     end)
   end)
 
+  describe("in-session trust cache", function()
+    it("does not re-prompt on second discover within same session", function()
+      local dir = make_project([[return { x = { name = "X", cmd = "x" } }]])
+
+      local secure_calls = 0
+      local original = vim.secure.read
+      vim.secure.read = function(p)
+        secure_calls = secure_calls + 1
+        local fd = io.open(p, "r")
+        local s = fd:read("*a")
+        fd:close()
+        return s
+      end
+
+      require("run").setup({ project = { trust = "prompt" } })
+      assert.is_true(require("run.project").has_project())
+      assert.equals(1, secure_calls)
+
+      require("run.project").discover()
+      require("run.project").discover()
+      vim.secure.read = original
+      assert.equals(1, secure_calls, "second/third discover should hit session cache, not re-prompt")
+    end)
+
+    it("invalidates cache by content change is bypassed within session (intentional)", function()
+      local dir = make_project([[return { v1 = { name = "V1", cmd = "x" } }]])
+
+      local original = vim.secure.read
+      vim.secure.read = function(p)
+        local fd = io.open(p, "r")
+        local s = fd:read("*a")
+        fd:close()
+        return s
+      end
+
+      require("run").setup({ project = { trust = "prompt" } })
+
+      helpers.write(dir .. "/run.nvim.lua", [[return { v2 = { name = "V2", cmd = "x" } }]])
+
+      vim.secure.read = function() error("should not be called: cached trust within session") end
+      require("run.project").discover()
+      vim.secure.read = original
+
+      assert.is_not_nil(require("run.project").commands().v2)
+    end)
+  end)
+
   describe("reload", function()
     it("re-reads project file from disk", function()
       local dir = make_project([[return { v1 = { name = "V1", cmd = "echo 1" } }]])

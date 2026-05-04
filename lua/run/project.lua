@@ -54,23 +54,41 @@ local function find_project_file()
   return matches[1]
 end
 
+local function read_file(path)
+  local fd, err = io.open(path, "r")
+  if not fd then
+    util.notify(("could not read %s: %s"):format(path, err), vim.log.levels.ERROR)
+    return nil
+  end
+  local src = fd:read("*a")
+  fd:close()
+  return src
+end
+
+---In-session trust cache: maps absolute project file path -> true once the
+---user has approved it (via vim.secure.read OR via the modeline confirm).
+---Avoids re-prompting on every BufWritePost / DirChanged within the same
+---Neovim session, since vim.secure.read invalidates trust on every content
+---change. Cleared at next nvim restart, so security is preserved across
+---sessions; users who want stricter intra-session checks can set
+---`project.trust = "prompt"` and restart between edits.
+local _session_trusted = {}
+
 ---Read the project file source, respecting the trust setting.
----@param path string
+---@param path string  absolute path
 ---@return string?  source code, or nil if untrusted/unreadable
 local function read_source(path)
   local trust = require("run.config").values.project.trust
   if trust == "never" then return nil end
-  if trust == "always" then
-    local fd, err = io.open(path, "r")
-    if not fd then
-      util.notify(("could not read %s: %s"):format(path, err), vim.log.levels.ERROR)
-      return nil
-    end
-    local src = fd:read("*a")
-    fd:close()
-    return src
-  end
-  return vim.secure.read(path)
+  if trust == "always" then return read_file(path) end
+
+  path = vim.fs.normalize(path)
+  if _session_trusted[path] then return read_file(path) end
+
+  util.notify(("loading project config: %s\n(answer the trust prompt below)"):format(path), vim.log.levels.INFO)
+  local src = vim.secure.read(path)
+  if src then _session_trusted[path] = true end
+  return src
 end
 
 ---@return string  absolute path to defaults.json
