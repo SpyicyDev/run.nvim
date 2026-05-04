@@ -27,4 +27,5 @@ test/temp/
 .luacov
 .luacov.report.out
 .sisyphus/
+.tests/
 

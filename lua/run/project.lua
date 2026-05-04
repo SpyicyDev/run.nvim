@@ -55,13 +55,17 @@ local function _validate(tbl)
   return true
 end
 
----Try to find the project file by walking up from cwd.
+---Try to find the project file by walking up from cwd (NOT from the current
+---buffer's directory — `vim.fn.findfile(name, ".;")` would do the latter).
 ---@return string?  absolute path or nil
 local function find_project_file()
   local filename = require("run.config").values.project.filename
-  local found = vim.fn.findfile(filename, ".;")
-  if found == "" then return nil end
-  return vim.fn.fnamemodify(found, ":p")
+  local matches = vim.fs.find(filename, {
+    upward = true,
+    type = "file",
+    path = vim.fn.getcwd(),
+  })
+  return matches[1]
 end
 
 ---Read the project file source, respecting the trust setting.

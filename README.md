@@ -1,5 +1,7 @@
 # run.nvim
 
+[![CI](https://github.com/SpyicyDev/run.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/SpyicyDev/run.nvim/actions/workflows/ci.yml)
+
 A small, opinionated command runner for Neovim. Run filetype-default commands or per-project commands declared in a single `run.nvim.lua` file at your project root. Shell, Vim, and Lua-function commands are all first-class.
 
 - Zero hard dependencies. Works out of the box with Neovim's built-in `:terminal`.
@@ -222,6 +224,19 @@ require("run").set_default()          -- open "set default" picker
 require("run").preview_cmd()          -- dry-run filetype command (notify)
 require("run").preview_cmd("test")    -- dry-run named project command
 ```
+
+## Development
+
+Run the test suite (auto-installs plenary.nvim into `.tests/` on first run):
+
+```bash
+make test
+make fmt-check    # stylua --check
+make fmt          # stylua format
+make clean        # remove .tests/
+```
+
+CI runs the suite on Neovim 0.10, 0.11, and nightly across Linux and macOS plus stylua formatting check (`.github/workflows/ci.yml`). See [`tests/README.md`](tests/README.md) for spec layout and authoring patterns.
 
 ## License
 
