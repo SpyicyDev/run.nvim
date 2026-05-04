@@ -11,6 +11,11 @@ local util = require("run.util")
 ---@type run.ProjectState
 M.state = { commands = {} }
 
+---True once `discover()` has been called at least once in this nvim session
+---(via setup's deferred trigger or via ensure_setup's sync fallback). Lets
+---ensure_setup avoid duplicating the deferred discover from setup().
+M.did_initial_discover = false
+
 local VALID_COMMAND_KEYS = { name = true, cmd = true, filetype = true }
 
 local function _validate(tbl)
@@ -77,7 +82,8 @@ end
 ---actual confirm dialog will appear.
 local function trusted_by_vim_secure(path)
   local trust_db = vim.fn.stdpath("state") .. "/trust"
-  local data = read_file_text(trust_db, "r")
+  -- Read in binary mode so missing-file is silent (no user-facing notify).
+  local data = read_file_text(trust_db, "rb")
   if not data then return false end
   local want = file_sha256(path)
   if not want then return false end
@@ -159,6 +165,7 @@ local function reset() M.state = { commands = {} } end
 ---Load the project file (if any) and populate `M.state`.
 ---Idempotent: safe to call repeatedly.
 function M.discover()
+  M.did_initial_discover = true
   reset()
   local path = find_project_file()
   if not path then return end

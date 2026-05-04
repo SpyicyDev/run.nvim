@@ -81,11 +81,24 @@ function M.apply(opts)
   _validate(M.values)
 end
 
----Lazy-bootstrap: if `setup()` was never called, run it with defaults.
----Lets users skip `setup({})` entirely and still hit the public API.
+---Lazy-bootstrap before any public API call.
+---
+---Two responsibilities:
+---  (a) If `setup()` was never called, run it with defaults so users can skip
+---      `setup({})` entirely.
+---  (b) If setup's deferred discover hasn't fired yet (same-tick public API
+---      call after setup, e.g. headless `setup() + run()` scripts), run
+---      discover synchronously now. Otherwise public APIs would see no
+---      project state until the next event-loop tick.
+---
+---Each path is idempotent — `discover()` sets `did_initial_discover = true`,
+---and the deferred callback in setup() checks that flag, so whichever fires
+---first wins and there's no double-discover cost.
 function M.ensure_setup()
   local run = require("run")
   if not run.did_setup then run.setup({}) end
+  local project = require("run.project")
+  if not project.did_initial_discover then project.discover() end
 end
 
 return M

@@ -181,7 +181,7 @@ describe("M.set_default UI flow", function()
 
   it("picking '[clear default]' clears", function()
     in_tmp_project([[return { a = { name = "A", cmd = "x" }, default = "a" }]], function()
-      require("run").setup({ project = { trust = "always" } })
+      helpers.setup_sync({ project = { trust = "always" } })
       assert.equals("a", require("run.project").get_default())
       local original = vim.ui.select
       vim.ui.select = function(items, _, on_choice)
@@ -205,12 +205,72 @@ describe("M.set_default UI flow", function()
   end)
 end)
 
+describe("setup() defers initial discover", function()
+  before_each(helpers.reset)
+
+  it("does NOT call discover synchronously inside setup()", function()
+    local dir = helpers.tmpdir()
+    helpers.write(dir .. "/run.nvim.lua", [[return { z = { name = "Z", cmd = "x" } }]])
+    vim.cmd("cd " .. dir)
+    require("run").setup({ project = { trust = "always" } })
+    assert.is_false(
+      require("run.project").did_initial_discover,
+      "discover should be deferred via vim.schedule, not run inside setup()"
+    )
+    assert.is_false(require("run.project").has_project())
+  end)
+
+  it("scheduled discover fires after setup returns (vim.wait yields)", function()
+    local dir = helpers.tmpdir()
+    helpers.write(dir .. "/run.nvim.lua", [[return { z = { name = "Z", cmd = "x" } }]])
+    vim.cmd("cd " .. dir)
+    require("run").setup({ project = { trust = "always" } })
+    vim.wait(50, function() return require("run.project").did_initial_discover end, 5)
+    assert.is_true(require("run.project").did_initial_discover)
+    assert.is_true(require("run.project").has_project())
+  end)
+
+  it("ensure_setup() forces sync discover for same-tick API calls", function()
+    local dir = helpers.tmpdir()
+    helpers.write(dir .. "/run.nvim.lua", [[return { z = { name = "Z", cmd = "x" } }]])
+    vim.cmd("cd " .. dir)
+    require("run").setup({ project = { trust = "always" } })
+    require("run.config").ensure_setup()
+    assert.is_true(require("run.project").did_initial_discover)
+    assert.is_true(require("run.project").has_project())
+  end)
+
+  it("scheduled discover is a no-op if ensure_setup already ran sync discover", function()
+    local dir = helpers.tmpdir()
+    helpers.write(dir .. "/run.nvim.lua", [[return { z = { name = "Z", cmd = "x" } }]])
+    vim.cmd("cd " .. dir)
+
+    local discover_calls = 0
+    local original = require("run.project").discover
+    require("run.project").discover = function(...)
+      discover_calls = discover_calls + 1
+      return original(...)
+    end
+
+    require("run").setup({ project = { trust = "always" } })
+    require("run.config").ensure_setup()
+    vim.wait(50, function() return false end, 5)
+
+    require("run.project").discover = original
+    assert.equals(
+      1,
+      discover_calls,
+      "discover should fire exactly once across the sync ensure_setup + scheduled callback"
+    )
+  end)
+end)
+
 describe("BufWritePost autoreload", function()
   before_each(helpers.reset)
 
   it("reloads project file when written", function()
     in_tmp_project([[return { v1 = { name = "V1", cmd = "x" } }]], function(dir)
-      require("run").setup({ project = { trust = "always" } })
+      helpers.setup_sync({ project = { trust = "always" } })
       assert.is_not_nil(require("run.project").commands().v1)
 
       vim.cmd("edit " .. dir .. "/run.nvim.lua")

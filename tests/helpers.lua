@@ -79,6 +79,20 @@ function M.hijack_state(tmpdir)
   return state_dir, function() vim.fn.stdpath = original end
 end
 
+---Run setup() and force a synchronous initial discover().
+---
+---Use this in tests that read project state directly (has_project(), commands(),
+---get_default(), path()) right after setup. Production code defers the initial
+---discover via vim.schedule() so UI plugins like noice can install their
+---hooks first; tests don't have an event loop tick to wait on, so we trigger
+---ensure_setup() which runs discover synchronously.
+---
+---@param opts? run.UserConfig
+function M.setup_sync(opts)
+  require("run").setup(opts)
+  require("run.config").ensure_setup()
+end
+
 ---Capture vim.notify calls for the duration of a function.
 ---@param fn function
 ---@return table[] notifications  list of { msg = ..., level = ... }

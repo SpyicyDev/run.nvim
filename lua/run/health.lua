@@ -49,6 +49,7 @@ function M.check()
   end
 
   vim.health.start("run.nvim — project")
+  pcall(function() require("run.config").ensure_setup() end)
   local project = require("run.project")
   if project.has_project() then
     vim.health.ok(("project file: %s"):format(project.path()))

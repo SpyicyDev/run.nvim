@@ -25,23 +25,29 @@ function M.setup(opts)
     return
   end
 
-  local project = require("run.project")
-  project.discover()
-
+  -- Autocmds register synchronously; they don't trigger UI prompts themselves.
   local aug = vim.api.nvim_create_augroup("run.nvim", { clear = true })
-
   vim.api.nvim_create_autocmd("DirChanged", {
     group = aug,
     desc = "run.nvim: rediscover project on cwd change",
-    callback = function() project.discover() end,
+    callback = function() require("run.project").discover() end,
   })
-
   vim.api.nvim_create_autocmd("BufWritePost", {
     group = aug,
     pattern = config.values.project.filename,
     desc = "run.nvim: reload project on save",
     callback = function() M.reload_proj() end,
   })
+
+  -- Defer the initial discover() so the synchronous load chain (e.g. lazy.nvim's
+  -- VeryLazy batch) unwinds first. This lets UI plugins like noice/dressing/snacks
+  -- install their cmdline/ui hooks BEFORE vim.secure.read's trust prompt fires —
+  -- otherwise the prompt uses raw vim styling regardless of the user's UI setup.
+  -- Skipped if a public API call (via ensure_setup) already triggered discover.
+  vim.schedule(function()
+    local project = require("run.project")
+    if not project.did_initial_discover then project.discover() end
+  end)
 end
 
 ---Run the current file's filetype command, or fall back to project default

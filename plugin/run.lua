@@ -39,6 +39,7 @@ vim.api.nvim_create_user_command(
     desc = "run.nvim: dry-run a command (no execution); arg = project command id",
     nargs = "?",
     complete = function()
+      pcall(function() require("run.config").ensure_setup() end)
       local ok, project = pcall(require, "run.project")
       if not ok or not project.has_project() then return {} end
       local ids = vim.tbl_keys(project.commands())
