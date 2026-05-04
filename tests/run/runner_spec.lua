@@ -61,6 +61,17 @@ describe("run.runner", function()
       "does NOT modify commands without %[fdnet] patterns",
       function() assert.equals("echo hello", require("run.runner").preview({ cmd = "echo hello" })) end
     )
+
+    it("preserves spaces in paths verbatim (shell-escape is the user's job)", function()
+      local space_dir = TMP .. "/has space"
+      vim.fn.mkdir(space_dir, "p")
+      local space_file = space_dir .. "/foo.bar.txt"
+      setup_with_named_buffer(space_file)
+      assert.equals("cat " .. space_file, require("run.runner").preview({ cmd = "cat %f" }))
+      assert.equals("ls " .. space_dir, require("run.runner").preview({ cmd = "ls %d" }))
+      assert.equals("wc foo.bar.txt", require("run.runner").preview({ cmd = "wc %t" }))
+      vim.fn.delete(space_dir, "rf")
+    end)
   end)
 
   describe("environment variable substitution (PR #2)", function()
