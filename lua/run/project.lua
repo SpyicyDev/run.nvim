@@ -14,27 +14,15 @@ M.state = { commands = {} }
 local VALID_COMMAND_KEYS = { name = true, cmd = true, filetype = true }
 
 local function _validate(tbl)
-  if type(tbl) ~= "table" then
-    return false, "project config must return a table"
-  end
+  if type(tbl) ~= "table" then return false, "project config must return a table" end
   for id, entry in pairs(tbl) do
     if id == "default" then
-      if type(entry) ~= "string" then
-        return false, "'default' must be a string command id"
-      end
-      if rawget(tbl, entry) == nil then
-        return false, ("default command '%s' does not exist"):format(entry)
-      end
+      if type(entry) ~= "string" then return false, "'default' must be a string command id" end
+      if rawget(tbl, entry) == nil then return false, ("default command '%s' does not exist"):format(entry) end
     else
-      if type(id) ~= "string" then
-        return false, ("command ids must be strings (got %s)"):format(type(id))
-      end
-      if id:sub(1, 1) == "_" then
-        return false, ("command id '%s' is reserved (leading underscore)"):format(id)
-      end
-      if type(entry) ~= "table" then
-        return false, ("command '%s' must be a table"):format(id)
-      end
+      if type(id) ~= "string" then return false, ("command ids must be strings (got %s)"):format(type(id)) end
+      if id:sub(1, 1) == "_" then return false, ("command id '%s' is reserved (leading underscore)"):format(id) end
+      if type(entry) ~= "table" then return false, ("command '%s' must be a table"):format(id) end
       if type(entry.name) ~= "string" or entry.name == "" then
         return false, ("command '%s' missing string 'name'"):format(id)
       end
@@ -46,9 +34,7 @@ local function _validate(tbl)
         return false, ("command '%s' 'filetype' must be a string"):format(id)
       end
       for k in pairs(entry) do
-        if not VALID_COMMAND_KEYS[k] then
-          return false, ("command '%s' has unknown key '%s'"):format(id, k)
-        end
+        if not VALID_COMMAND_KEYS[k] then return false, ("command '%s' has unknown key '%s'"):format(id, k) end
       end
     end
   end
@@ -73,9 +59,7 @@ end
 ---@return string?  source code, or nil if untrusted/unreadable
 local function read_source(path)
   local trust = require("run.config").values.project.trust
-  if trust == "never" then
-    return nil
-  end
+  if trust == "never" then return nil end
   if trust == "always" then
     local fd, err = io.open(path, "r")
     if not fd then
@@ -124,15 +108,11 @@ local function save_defaults_db(db)
   fd:write(vim.json.encode(db))
   fd:close()
   local ok, rename_err = os.rename(tmp, path)
-  if not ok then
-    util.notify(("could not rename defaults state file: %s"):format(rename_err), vim.log.levels.ERROR)
-  end
+  if not ok then util.notify(("could not rename defaults state file: %s"):format(rename_err), vim.log.levels.ERROR) end
 end
 
 ---Reset cached project state.
-local function reset()
-  M.state = { commands = {} }
-end
+local function reset() M.state = { commands = {} } end
 
 ---Load the project file (if any) and populate `M.state`.
 ---Idempotent: safe to call repeatedly.
@@ -142,9 +122,7 @@ function M.discover()
   if not path then return end
 
   local source = read_source(path)
-  if not source then
-    return
-  end
+  if not source then return end
 
   local chunk, load_err = loadstring(source, "@" .. path)
   if not chunk then
@@ -166,9 +144,7 @@ function M.discover()
 
   local commands = {}
   for id, entry in pairs(result) do
-    if id ~= "default" then
-      commands[id] = entry
-    end
+    if id ~= "default" then commands[id] = entry end
   end
 
   M.state.path = path
@@ -177,9 +153,7 @@ function M.discover()
   M.state.default = result.default
 
   local persisted = load_defaults_db()[M.state.root]
-  if persisted and commands[persisted] then
-    M.state.default = persisted
-  end
+  if persisted and commands[persisted] then M.state.default = persisted end
 end
 
 ---Persist a chosen default to the state DB. Pass nil to clear.
@@ -198,23 +172,15 @@ end
 
 ---Whether a project file is currently loaded.
 ---@return boolean
-function M.has_project()
-  return M.state.path ~= nil
-end
+function M.has_project() return M.state.path ~= nil end
 
 ---@return string?
-function M.path()
-  return M.state.path
-end
+function M.path() return M.state.path end
 
 ---@return table<string, run.CommandSpec>
-function M.commands()
-  return M.state.commands
-end
+function M.commands() return M.state.commands end
 
 ---@return string?
-function M.get_default()
-  return M.state.default
-end
+function M.get_default() return M.state.default end
 
 return M

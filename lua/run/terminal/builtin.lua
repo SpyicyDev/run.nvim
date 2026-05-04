@@ -52,9 +52,7 @@ function M.run(cmd, opts)
 
   local close_on_exit = opts.close_on_exit
   local on_exit = function(_, code)
-    if close_on_exit and code == 0 and vim.api.nvim_win_is_valid(win) then
-      vim.api.nvim_win_close(win, true)
-    end
+    if close_on_exit and code == 0 and vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_close(win, true) end
   end
 
   local ok, err = pcall(vim.fn.jobstart, { vim.o.shell, "-c", cmd }, {

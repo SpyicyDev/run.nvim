@@ -85,9 +85,7 @@ end
 ---Lets users skip `setup({})` entirely and still hit the public API.
 function M.ensure_setup()
   local run = require("run")
-  if not run.did_setup then
-    run.setup({})
-  end
+  if not run.did_setup then run.setup({}) end
 end
 
 return M

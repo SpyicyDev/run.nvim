@@ -38,9 +38,7 @@ end
 ---Resolve a path through filesystem symlinks (handles macOS `/tmp` → `/private/tmp`).
 ---@param path string
 ---@return string
-function M.resolve(path)
-  return vim.uv.fs_realpath(path) or path
-end
+function M.resolve(path) return vim.uv.fs_realpath(path) or path end
 
 ---Make a fresh tmpdir and register cleanup.
 ---@return string  absolute path
@@ -87,9 +85,7 @@ end
 function M.capture_notify(fn)
   local original = vim.notify
   local notifications = {}
-  vim.notify = function(msg, level, _opts)
-    table.insert(notifications, { msg = msg, level = level })
-  end
+  vim.notify = function(msg, level, _opts) table.insert(notifications, { msg = msg, level = level }) end
   local ok, err = pcall(fn)
   vim.notify = original
   if not ok then error(err) end

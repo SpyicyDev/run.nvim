@@ -5,9 +5,7 @@ if vim.fn.has("nvim-0.10") == 0 then
   return
 end
 
-if vim.g.loaded_run == 1 then
-  return
-end
+if vim.g.loaded_run == 1 then return end
 vim.g.loaded_run = 1
 
 local function dispatch(method)
@@ -34,16 +32,18 @@ vim.api.nvim_create_user_command("RunReloadProj", dispatch("reload_proj"), {
   nargs = 0,
 })
 
-vim.api.nvim_create_user_command("RunPreview", function(opts)
-  require("run").preview_cmd(opts.args ~= "" and opts.args or nil)
-end, {
-  desc = "run.nvim: dry-run a command (no execution); arg = project command id",
-  nargs = "?",
-  complete = function()
-    local ok, project = pcall(require, "run.project")
-    if not ok or not project.has_project() then return {} end
-    local ids = vim.tbl_keys(project.commands())
-    table.sort(ids)
-    return ids
-  end,
-})
+vim.api.nvim_create_user_command(
+  "RunPreview",
+  function(opts) require("run").preview_cmd(opts.args ~= "" and opts.args or nil) end,
+  {
+    desc = "run.nvim: dry-run a command (no execution); arg = project command id",
+    nargs = "?",
+    complete = function()
+      local ok, project = pcall(require, "run.project")
+      if not ok or not project.has_project() then return {} end
+      local ids = vim.tbl_keys(project.commands())
+      table.sort(ids)
+      return ids
+    end,
+  }
+)

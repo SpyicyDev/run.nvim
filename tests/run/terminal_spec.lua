@@ -35,9 +35,9 @@ describe("run.terminal backend adapters fall back gracefully when plugin missing
     require("run").setup({})
     package.loaded.snacks = nil
     package.preload.snacks = function() error("missing") end
-    local notes = helpers.capture_notify(function()
-      pcall(require("run.terminal.snacks").run, "true", require("run.config").values.terminal)
-    end)
+    local notes = helpers.capture_notify(
+      function() pcall(require("run.terminal.snacks").run, "true", require("run.config").values.terminal) end
+    )
     assert.is_not_nil(helpers.find_notify(notes, "snacks.terminal not available"))
     package.preload.snacks = nil
   end)
@@ -46,9 +46,9 @@ describe("run.terminal backend adapters fall back gracefully when plugin missing
     require("run").setup({})
     package.loaded.toggleterm = nil
     package.preload.toggleterm = function() error("missing") end
-    local notes = helpers.capture_notify(function()
-      pcall(require("run.terminal.toggleterm").run, "true", require("run.config").values.terminal)
-    end)
+    local notes = helpers.capture_notify(
+      function() pcall(require("run.terminal.toggleterm").run, "true", require("run.config").values.terminal) end
+    )
     assert.is_not_nil(helpers.find_notify(notes, "toggleterm.nvim not available"))
     package.preload.toggleterm = nil
   end)
@@ -57,9 +57,9 @@ describe("run.terminal backend adapters fall back gracefully when plugin missing
     require("run").setup({})
     package.loaded.FTerm = nil
     package.preload.FTerm = function() error("missing") end
-    local notes = helpers.capture_notify(function()
-      pcall(require("run.terminal.fterm").run, "true", require("run.config").values.terminal)
-    end)
+    local notes = helpers.capture_notify(
+      function() pcall(require("run.terminal.fterm").run, "true", require("run.config").values.terminal) end
+    )
     assert.is_not_nil(helpers.find_notify(notes, "FTerm.nvim not available"))
     package.preload.FTerm = nil
   end)

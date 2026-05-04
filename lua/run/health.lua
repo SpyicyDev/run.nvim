@@ -44,9 +44,7 @@ function M.check()
   if backend_cfg ~= "auto" and backend_cfg ~= "builtin" then
     local mod = BACKEND_MODULE[backend_cfg]
     if mod and not pcall(require, mod) then
-      vim.health.warn(
-        ("configured backend '%s' not installed; will fall back to built-in"):format(backend_cfg)
-      )
+      vim.health.warn(("configured backend '%s' not installed; will fall back to built-in"):format(backend_cfg))
     end
   end
 
@@ -55,9 +53,7 @@ function M.check()
   if project.has_project() then
     vim.health.ok(("project file: %s"):format(project.path()))
     vim.health.info(("commands: %d"):format(vim.tbl_count(project.commands())))
-    if project.get_default() then
-      vim.health.info(("default command: %s"):format(project.get_default()))
-    end
+    if project.get_default() then vim.health.info(("default command: %s"):format(project.get_default())) end
   else
     vim.health.info("no run.nvim.lua in cwd or ancestors")
   end

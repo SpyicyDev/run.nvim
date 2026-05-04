@@ -6,10 +6,7 @@ local M = {}
 function M.run(cmd, opts)
   local ok_mod, fterm = pcall(require, "FTerm")
   if not ok_mod then
-    require("run.util").notify(
-      "FTerm.nvim not available; falling back to built-in terminal",
-      vim.log.levels.WARN
-    )
+    require("run.util").notify("FTerm.nvim not available; falling back to built-in terminal", vim.log.levels.WARN)
     return require("run.terminal.builtin").run(cmd, opts)
   end
 
@@ -18,10 +15,7 @@ function M.run(cmd, opts)
     auto_close = opts.close_on_exit,
   })
   if not ok then
-    require("run.util").notify(
-      ("FTerm.scratch failed: %s"):format(err),
-      vim.log.levels.ERROR
-    )
+    require("run.util").notify(("FTerm.scratch failed: %s"):format(err), vim.log.levels.ERROR)
     return false
   end
   return true

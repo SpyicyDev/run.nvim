@@ -37,10 +37,7 @@ function M.run(cmd)
   local backend = M.detect()
   local ok, mod = pcall(require, "run.terminal." .. backend)
   if not ok then
-    require("run.util").notify(
-      ("terminal backend '%s' failed to load: %s"):format(backend, mod),
-      vim.log.levels.ERROR
-    )
+    require("run.util").notify(("terminal backend '%s' failed to load: %s"):format(backend, mod), vim.log.levels.ERROR)
     return false
   end
   return mod.run(cmd, require("run.config").values.terminal)

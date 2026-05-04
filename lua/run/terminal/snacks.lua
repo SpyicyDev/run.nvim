@@ -15,10 +15,7 @@ local POSITION_MAP = {
 function M.run(cmd, opts)
   local snacks_ok, snacks = pcall(require, "snacks")
   if not snacks_ok or not snacks.terminal then
-    require("run.util").notify(
-      "snacks.terminal not available; falling back to built-in terminal",
-      vim.log.levels.WARN
-    )
+    require("run.util").notify("snacks.terminal not available; falling back to built-in terminal", vim.log.levels.WARN)
     return require("run.terminal.builtin").run(cmd, opts)
   end
 
@@ -31,10 +28,7 @@ function M.run(cmd, opts)
     auto_close = opts.close_on_exit,
   })
   if not ok then
-    require("run.util").notify(
-      ("snacks.terminal failed: %s"):format(err),
-      vim.log.levels.ERROR
-    )
+    require("run.util").notify(("snacks.terminal failed: %s"):format(err), vim.log.levels.ERROR)
     return false
   end
   return true

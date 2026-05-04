@@ -23,44 +23,44 @@ describe("run.runner", function()
       assert.equals("cat " .. file, cmd)
     end)
 
-    it("substitutes %d (directory)", function()
-      assert.equals("ls " .. TMP, require("run.runner").preview({ cmd = "ls %d" }))
-    end)
+    it(
+      "substitutes %d (directory)",
+      function() assert.equals("ls " .. TMP, require("run.runner").preview({ cmd = "ls %d" })) end
+    )
 
-    it("substitutes %t (basename with extension)", function()
-      assert.equals("wc foo.bar.txt", require("run.runner").preview({ cmd = "wc %t" }))
-    end)
+    it(
+      "substitutes %t (basename with extension)",
+      function() assert.equals("wc foo.bar.txt", require("run.runner").preview({ cmd = "wc %t" })) end
+    )
 
-    it("substitutes %n (basename without extension)", function()
-      assert.equals("echo foo.bar", require("run.runner").preview({ cmd = "echo %n" }))
-    end)
+    it(
+      "substitutes %n (basename without extension)",
+      function() assert.equals("echo foo.bar", require("run.runner").preview({ cmd = "echo %n" })) end
+    )
 
-    it("substitutes %e (extension, no dot)", function()
-      assert.equals("echo txt", require("run.runner").preview({ cmd = "echo %e" }))
-    end)
+    it(
+      "substitutes %e (extension, no dot)",
+      function() assert.equals("echo txt", require("run.runner").preview({ cmd = "echo %e" })) end
+    )
 
     it("substitutes all in one command", function()
       local cmd = require("run.runner").preview({ cmd = "cd %d && wc %t # n=%n e=%e f=%f" })
-      assert.equals(
-        ("cd %s && wc foo.bar.txt # n=foo.bar e=txt f=%s"):format(TMP, file),
-        cmd
-      )
+      assert.equals(("cd %s && wc foo.bar.txt # n=foo.bar e=txt f=%s"):format(TMP, file), cmd)
     end)
 
     it("returns nil and warns when %f used on unnamed buffer (B13)", function()
       vim.cmd("enew")
       require("run").setup({})
       local cmd
-      local notes = helpers.capture_notify(function()
-        cmd = require("run.runner").preview({ cmd = "cat %f" })
-      end)
+      local notes = helpers.capture_notify(function() cmd = require("run.runner").preview({ cmd = "cat %f" }) end)
       assert.is_nil(cmd)
       assert.is_not_nil(helpers.find_notify(notes, "no file in current buffer"))
     end)
 
-    it("does NOT modify commands without %[fdnet] patterns", function()
-      assert.equals("echo hello", require("run.runner").preview({ cmd = "echo hello" }))
-    end)
+    it(
+      "does NOT modify commands without %[fdnet] patterns",
+      function() assert.equals("echo hello", require("run.runner").preview({ cmd = "echo hello" })) end
+    )
   end)
 
   describe("environment variable substitution (PR #2)", function()
@@ -75,26 +75,31 @@ describe("run.runner", function()
       vim.env.RUN_TEST_OTHER = nil
     end)
 
-    it("substitutes $VAR form", function()
-      assert.equals("echo vimenv_value", require("run.runner").preview({ cmd = "echo $RUN_TEST_VAR" }))
-    end)
+    it(
+      "substitutes $VAR form",
+      function() assert.equals("echo vimenv_value", require("run.runner").preview({ cmd = "echo $RUN_TEST_VAR" })) end
+    )
 
-    it("substitutes ${VAR} form", function()
-      assert.equals("echo vimenv_value", require("run.runner").preview({ cmd = "echo ${RUN_TEST_VAR}" }))
-    end)
+    it(
+      "substitutes ${VAR} form",
+      function() assert.equals("echo vimenv_value", require("run.runner").preview({ cmd = "echo ${RUN_TEST_VAR}" })) end
+    )
 
-    it("substitutes multiple in one command", function()
-      assert.equals(
-        "echo vimenv_value other_value",
-        require("run.runner").preview({ cmd = "echo $RUN_TEST_VAR ${RUN_TEST_OTHER}" })
-      )
-    end)
+    it(
+      "substitutes multiple in one command",
+      function()
+        assert.equals(
+          "echo vimenv_value other_value",
+          require("run.runner").preview({ cmd = "echo $RUN_TEST_VAR ${RUN_TEST_OTHER}" })
+        )
+      end
+    )
 
     it("warns and leaves literal text on missing var", function()
       local cmd
-      local notes = helpers.capture_notify(function()
-        cmd = require("run.runner").preview({ cmd = "echo $RUN_DEFINITELY_NOT_SET_42" })
-      end)
+      local notes = helpers.capture_notify(
+        function() cmd = require("run.runner").preview({ cmd = "echo $RUN_DEFINITELY_NOT_SET_42" }) end
+      )
       assert.equals("echo $RUN_DEFINITELY_NOT_SET_42", cmd)
       assert.is_not_nil(helpers.find_notify(notes, "RUN_DEFINITELY_NOT_SET_42 is not set"))
     end)
@@ -115,17 +120,14 @@ describe("run.runner", function()
       assert.is_not_nil(pat)
     end)
 
-    it("blocks rm -rf *", function()
-      assert.is_false((require("run.runner").check_safety("rm -rf *")))
-    end)
+    it("blocks rm -rf *", function() assert.is_false((require("run.runner").check_safety("rm -rf *"))) end)
 
-    it("blocks sudo rm -rf", function()
-      assert.is_false((require("run.runner").check_safety("sudo rm -rf /tmp/x")))
-    end)
+    it("blocks sudo rm -rf", function() assert.is_false((require("run.runner").check_safety("sudo rm -rf /tmp/x"))) end)
 
-    it("blocks Vim shell-out :!rm", function()
-      assert.is_false((require("run.runner").check_safety(":!rm something")))
-    end)
+    it(
+      "blocks Vim shell-out :!rm",
+      function() assert.is_false((require("run.runner").check_safety(":!rm something"))) end
+    )
 
     it("permits ordinary commands", function()
       assert.is_true((require("run.runner").check_safety("echo hello")))
@@ -136,18 +138,14 @@ describe("run.runner", function()
     it("execute() refuses dangerous commands and notifies", function()
       require("run").setup({})
       local ok
-      local notes = helpers.capture_notify(function()
-        ok = require("run.runner").execute({ cmd = "rm -rf /" })
-      end)
+      local notes = helpers.capture_notify(function() ok = require("run.runner").execute({ cmd = "rm -rf /" }) end)
       assert.is_false(ok)
       assert.is_not_nil(helpers.find_notify(notes, "dangerous pattern"))
     end)
   end)
 
   describe("command spec dispatch", function()
-    before_each(function()
-      require("run").setup({})
-    end)
+    before_each(function() require("run").setup({}) end)
 
     it("string spec is treated as cmd", function()
       vim.g._dispatch_test = nil
@@ -188,27 +186,23 @@ describe("run.runner", function()
 
     it("invalid spec type returns false and notifies", function()
       local ok
-      local notes = helpers.capture_notify(function()
-        ok = require("run.runner").execute(42)
-      end)
+      local notes = helpers.capture_notify(function() ok = require("run.runner").execute(42) end)
       assert.is_false(ok)
       assert.is_not_nil(helpers.find_notify(notes, "command spec must be"))
     end)
 
     it("table spec with bad cmd type returns false and notifies", function()
       local ok
-      local notes = helpers.capture_notify(function()
-        ok = require("run.runner").execute({ cmd = 42 })
-      end)
+      local notes = helpers.capture_notify(function() ok = require("run.runner").execute({ cmd = 42 }) end)
       assert.is_false(ok)
       assert.is_not_nil(helpers.find_notify(notes, "must be a string, or a function"))
     end)
 
     it("vim cmd error returns false and notifies", function()
       local ok
-      local notes = helpers.capture_notify(function()
-        ok = require("run.runner").execute({ cmd = ":NotARealCommand" })
-      end)
+      local notes = helpers.capture_notify(
+        function() ok = require("run.runner").execute({ cmd = ":NotARealCommand" }) end
+      )
       assert.is_false(ok)
       assert.is_not_nil(helpers.find_notify(notes, "vim command failed"))
     end)
@@ -233,9 +227,7 @@ describe("run.runner", function()
     end)
 
     it("returns nil for invalid spec", function()
-      helpers.capture_notify(function()
-        assert.is_nil(require("run.runner").preview({ cmd = 42 }))
-      end)
+      helpers.capture_notify(function() assert.is_nil(require("run.runner").preview({ cmd = 42 })) end)
     end)
   end)
 end)

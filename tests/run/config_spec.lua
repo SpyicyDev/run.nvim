@@ -32,48 +32,34 @@ describe("run.config", function()
 
   describe("validation", function()
     it("rejects bad backend", function()
-      assert.has_error(function()
-        require("run.config").apply({ terminal = { backend = "nonsense" } })
-      end)
+      assert.has_error(function() require("run.config").apply({ terminal = { backend = "nonsense" } }) end)
     end)
 
     it("rejects bad position", function()
-      assert.has_error(function()
-        require("run.config").apply({ terminal = { position = "sideways" } })
-      end)
+      assert.has_error(function() require("run.config").apply({ terminal = { position = "sideways" } }) end)
     end)
 
     it("rejects bad trust", function()
-      assert.has_error(function()
-        require("run.config").apply({ project = { trust = "maybe" } })
-      end)
+      assert.has_error(function() require("run.config").apply({ project = { trust = "maybe" } }) end)
     end)
 
     it("rejects non-table filetype", function()
-      assert.has_error(function()
-        require("run.config").apply({ filetype = "not a table" })
-      end)
+      assert.has_error(function() require("run.config").apply({ filetype = "not a table" }) end)
     end)
 
     it("rejects non-boolean notify", function()
-      assert.has_error(function()
-        require("run.config").apply({ notify = "yes" })
-      end)
+      assert.has_error(function() require("run.config").apply({ notify = "yes" }) end)
     end)
 
     it("accepts all valid backends", function()
       for _, b in ipairs({ "auto", "builtin", "snacks", "toggleterm", "fterm" }) do
-        assert.has_no_errors(function()
-          require("run.config").apply({ terminal = { backend = b } })
-        end)
+        assert.has_no_errors(function() require("run.config").apply({ terminal = { backend = b } }) end)
       end
     end)
 
     it("accepts all valid positions", function()
       for _, p in ipairs({ "float", "bottom", "top", "left", "right", "tab" }) do
-        assert.has_no_errors(function()
-          require("run.config").apply({ terminal = { position = p } })
-        end)
+        assert.has_no_errors(function() require("run.config").apply({ terminal = { position = p } }) end)
       end
     end)
   end)

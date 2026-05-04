@@ -17,9 +17,7 @@ local DANGEROUS_PATTERNS = {
 ---@param cmd string
 ---@return string
 local function expand_env(cmd)
-  local function lookup(name)
-    return vim.env[name] or os.getenv(name)
-  end
+  local function lookup(name) return vim.env[name] or os.getenv(name) end
   cmd = cmd:gsub("%${([%w_]+)}", function(name)
     local v = lookup(name)
     if v then return v end
@@ -44,9 +42,7 @@ end
 ---@param cmd string
 ---@return string?
 local function expand_file(cmd)
-  if not cmd:find(FILE_PATTERN) then
-    return cmd
-  end
+  if not cmd:find(FILE_PATTERN) then return cmd end
   local path = util.buffer_path(0)
   if not path then
     util.notify("no file in current buffer for %f/%d/%n/%e/%t substitution", vim.log.levels.ERROR)
@@ -81,9 +77,7 @@ end
 function M.check_safety(cmd)
   local lowered = cmd:lower()
   for _, pat in ipairs(DANGEROUS_PATTERNS) do
-    if lowered:find(pat) then
-      return false, pat
-    end
+    if lowered:find(pat) then return false, pat end
   end
   return true
 end
@@ -97,9 +91,7 @@ local function exec_vim(vim_cmd)
   return true
 end
 
-local function exec_shell(shell_cmd)
-  return require("run.terminal").run(shell_cmd)
-end
+local function exec_shell(shell_cmd) return require("run.terminal").run(shell_cmd) end
 
 ---Resolve a command spec into one of three outcomes:
 ---  "run"   — execute `cmd` (a string)
@@ -109,9 +101,7 @@ end
 ---@return "run"|"skip"|"error" status
 ---@return string? cmd
 local function resolve(spec)
-  if type(spec) == "string" then
-    return "run", spec
-  end
+  if type(spec) == "string" then return "run", spec end
   if type(spec) ~= "table" then
     util.notify(("command spec must be table or string, got %s"):format(type(spec)), vim.log.levels.ERROR)
     return "error"
@@ -157,9 +147,7 @@ function M.execute(spec)
     util.notify(("refusing to run command matching dangerous pattern: %s"):format(pattern), vim.log.levels.ERROR)
     return false
   end
-  if cmd:sub(1, 1) == ":" then
-    return exec_vim(cmd:sub(2))
-  end
+  if cmd:sub(1, 1) == ":" then return exec_vim(cmd:sub(2)) end
   return exec_shell(cmd)
 end
 

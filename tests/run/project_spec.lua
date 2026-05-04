@@ -47,9 +47,7 @@ describe("run.project", function()
   describe("validation (B11)", function()
     local function load_invalid(content)
       make_project(content)
-      local notes = helpers.capture_notify(function()
-        require("run").setup({ project = { trust = "always" } })
-      end)
+      local notes = helpers.capture_notify(function() require("run").setup({ project = { trust = "always" } }) end)
       return notes
     end
 
@@ -154,8 +152,7 @@ return {
       local dir2 = make_project([[return { b = { name = "B", cmd = "b" } }]])
       helpers.reset()
       require("run").setup({ project = { trust = "always" } })
-      assert.is_nil(require("run.project").get_default(),
-        "should not inherit default from a different project")
+      assert.is_nil(require("run.project").get_default(), "should not inherit default from a different project")
 
       restore()
     end)
@@ -167,8 +164,7 @@ return {
       require("run").setup({ project = { trust = "always" } })
       assert.is_not_nil(require("run.project").commands().v1)
 
-      helpers.write(dir .. "/run.nvim.lua",
-        [[return { v2 = { name = "V2", cmd = "echo 2" } }]])
+      helpers.write(dir .. "/run.nvim.lua", [[return { v2 = { name = "V2", cmd = "echo 2" } }]])
       require("run.project").discover()
       assert.is_nil(require("run.project").commands().v1)
       assert.is_not_nil(require("run.project").commands().v2)
@@ -189,9 +185,7 @@ return {
     it("preview_cmd(id) for project command resolves without executing", function()
       make_project([[return { build = { name = "Build", cmd = "make build" } }]])
       require("run").setup({ project = { trust = "always" } })
-      local notes = helpers.capture_notify(function()
-        require("run").preview_cmd("build")
-      end)
+      local notes = helpers.capture_notify(function() require("run").preview_cmd("build") end)
       assert.is_not_nil(helpers.find_notify(notes, "would run: make build"))
     end)
 
@@ -201,27 +195,21 @@ return {
       vim.api.nvim_buf_set_name(0, p)
       vim.bo.filetype = "lua"
       require("run").setup({ filetype = { lua = "lua %f" } })
-      local notes = helpers.capture_notify(function()
-        require("run").preview_cmd()
-      end)
+      local notes = helpers.capture_notify(function() require("run").preview_cmd() end)
       assert.is_not_nil(helpers.find_notify(notes, "would run: lua " .. vim.pesc(p)))
     end)
 
     it("preview_cmd(unknown) errors politely", function()
       make_project([[return { build = { name = "Build", cmd = "x" } }]])
       require("run").setup({ project = { trust = "always" } })
-      local notes = helpers.capture_notify(function()
-        require("run").preview_cmd("nonexistent")
-      end)
+      local notes = helpers.capture_notify(function() require("run").preview_cmd("nonexistent") end)
       assert.is_not_nil(helpers.find_notify(notes, "project command not found"))
     end)
 
     it("preview flags dangerous commands as UNSAFE", function()
       make_project([[return { evil = { name = "Evil", cmd = "rm -rf /" } }]])
       require("run").setup({ project = { trust = "always" } })
-      local notes = helpers.capture_notify(function()
-        require("run").preview_cmd("evil")
-      end)
+      local notes = helpers.capture_notify(function() require("run").preview_cmd("evil") end)
       assert.is_not_nil(helpers.find_notify(notes, "UNSAFE"))
     end)
   end)

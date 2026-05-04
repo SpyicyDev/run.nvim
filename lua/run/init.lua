@@ -14,22 +14,14 @@ function M.setup(opts)
   M.did_setup = true
 
   if vim.fn.has("nvim-0.10") == 0 then
-    vim.notify(
-      "run.nvim requires Neovim 0.10 or newer",
-      vim.log.levels.ERROR,
-      { title = "run.nvim" }
-    )
+    vim.notify("run.nvim requires Neovim 0.10 or newer", vim.log.levels.ERROR, { title = "run.nvim" })
     return
   end
 
   local config = require("run.config")
   local ok, err = pcall(config.apply, opts)
   if not ok then
-    vim.notify(
-      ("run.nvim: invalid config: %s"):format(err),
-      vim.log.levels.ERROR,
-      { title = "run.nvim" }
-    )
+    vim.notify(("run.nvim: invalid config: %s"):format(err), vim.log.levels.ERROR, { title = "run.nvim" })
     return
   end
 
@@ -59,9 +51,7 @@ function M.run()
   require("run.config").ensure_setup()
   local project = require("run.project")
   if project.has_project() then
-    if project.get_default() then
-      return M.run_proj_default()
-    end
+    if project.get_default() then return M.run_proj_default() end
     return M.run_proj()
   end
   return M.run_file()
@@ -87,9 +77,7 @@ function M.run_file()
     return false
   end
 
-  if type(entry) == "string" or type(entry) == "function" then
-    return runner.execute({ cmd = entry })
-  end
+  if type(entry) == "string" or type(entry) == "function" then return runner.execute({ cmd = entry }) end
   if type(entry) == "table" then
     if entry.cmd == nil then
       util.notify(("filetype '%s' entry missing 'cmd'"):format(ft), vim.log.levels.ERROR)
@@ -258,9 +246,7 @@ function M.set_default()
   end
   table.sort(items, function(a, b) return a.display < b.display end)
 
-  if project.get_default() then
-    table.insert(items, { kind = "clear", display = "[clear default]" })
-  end
+  if project.get_default() then table.insert(items, { kind = "clear", display = "[clear default]" }) end
 
   ui.pick(items, "run.nvim — set default", function(item)
     if not item then return end

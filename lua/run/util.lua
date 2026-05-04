@@ -10,9 +10,7 @@ function M.notify(msg, level)
   -- Avoid a hard `require("run.config")` cycle at module load: only resolve
   -- the config table when we actually emit a notification.
   local ok, config = pcall(require, "run.config")
-  if ok and config.values and config.values.notify == false then
-    return
-  end
+  if ok and config.values and config.values.notify == false then return end
   vim.notify(msg, level or vim.log.levels.INFO, { title = "run.nvim" })
 end
 
@@ -21,9 +19,7 @@ end
 ---@return string?
 function M.buffer_path(bufnr)
   local name = vim.api.nvim_buf_get_name(bufnr or 0)
-  if name == nil or name == "" then
-    return nil
-  end
+  if name == nil or name == "" then return nil end
   return name
 end
 
@@ -34,13 +30,9 @@ end
 function M.buffer_filetype(bufnr)
   bufnr = bufnr or 0
   local ft = vim.bo[bufnr].filetype
-  if ft and ft ~= "" then
-    return ft
-  end
+  if ft and ft ~= "" then return ft end
   local name = vim.api.nvim_buf_get_name(bufnr)
-  if name == "" then
-    return nil
-  end
+  if name == "" then return nil end
   return vim.filetype.match({ filename = name })
 end
 
