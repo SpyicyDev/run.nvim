@@ -98,6 +98,10 @@ end
 ---Add `<hash> <path>` to the trust DB (replacing any prior entry for the
 ---same path). Same on-disk format vim.secure uses, so future
 ---vim.secure.read calls on this file will short-circuit too.
+---
+---Write is atomic (write-temp-then-rename) because the trust DB is shared
+---with vim.secure across the entire Neovim ecosystem; a partial write here
+---would corrupt trust for every plugin that uses vim.secure.read.
 ---@return boolean ok
 local function persist_trust(path)
   local hash = file_sha256(path)
@@ -110,13 +114,20 @@ local function persist_trust(path)
   end
   table.insert(entries, hash .. " " .. path)
   vim.fn.mkdir(vim.fn.stdpath("state"), "p")
-  local fd, err = io.open(trust_db_path(), "w")
+  local final = trust_db_path()
+  local tmp = final .. ".tmp"
+  local fd, err = io.open(tmp, "w")
   if not fd then
     util.notify(("could not write trust DB: %s"):format(err), vim.log.levels.ERROR)
     return false
   end
   fd:write(table.concat(entries, "\n") .. "\n")
   fd:close()
+  local ok, rename_err = os.rename(tmp, final)
+  if not ok then
+    util.notify(("could not rename trust DB: %s"):format(rename_err), vim.log.levels.ERROR)
+    return false
+  end
   return true
 end
 
