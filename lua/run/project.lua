@@ -54,10 +54,10 @@ local function find_project_file()
   return matches[1]
 end
 
-local function read_file(path)
-  local fd, err = io.open(path, "r")
+local function read_file_text(path, mode)
+  local fd, err = io.open(path, mode or "r")
   if not fd then
-    util.notify(("could not read %s: %s"):format(path, err), vim.log.levels.ERROR)
+    if mode ~= "rb" then util.notify(("could not read %s: %s"):format(path, err), vim.log.levels.ERROR) end
     return nil
   end
   local src = fd:read("*a")
@@ -65,13 +65,34 @@ local function read_file(path)
   return src
 end
 
+---SHA-256 of the file's raw bytes (matches what vim.secure stores).
+local function file_sha256(path)
+  local content = read_file_text(path, "rb")
+  if not content then return nil end
+  return vim.fn.sha256(content)
+end
+
+---Check whether vim.secure already trusts the file at `path` with its
+---current content. Lets us skip the pre-prompt notification when no
+---actual confirm dialog will appear.
+local function trusted_by_vim_secure(path)
+  local trust_db = vim.fn.stdpath("state") .. "/trust"
+  local data = read_file_text(trust_db, "r")
+  if not data then return false end
+  local want = file_sha256(path)
+  if not want then return false end
+  for line in data:gmatch("[^\n]+") do
+    local hash, p = line:match("^(%S+)%s+(.+)$")
+    if p == path and hash == want then return true end
+  end
+  return false
+end
+
 ---In-session trust cache: maps absolute project file path -> true once the
----user has approved it (via vim.secure.read OR via the modeline confirm).
----Avoids re-prompting on every BufWritePost / DirChanged within the same
----Neovim session, since vim.secure.read invalidates trust on every content
----change. Cleared at next nvim restart, so security is preserved across
----sessions; users who want stricter intra-session checks can set
----`project.trust = "prompt"` and restart between edits.
+---user has approved it. Avoids re-prompting on BufWritePost / DirChanged
+---within the same Neovim session, since vim.secure.read invalidates trust
+---whenever file content changes. Cleared at next nvim restart, so the
+---cross-session security guarantee of vim.secure is preserved.
 local _session_trusted = {}
 
 ---Read the project file source, respecting the trust setting.
@@ -80,10 +101,13 @@ local _session_trusted = {}
 local function read_source(path)
   local trust = require("run.config").values.project.trust
   if trust == "never" then return nil end
-  if trust == "always" then return read_file(path) end
+  if trust == "always" then return read_file_text(path) end
 
   path = vim.fs.normalize(path)
-  if _session_trusted[path] then return read_file(path) end
+  if _session_trusted[path] or trusted_by_vim_secure(path) then
+    _session_trusted[path] = true
+    return read_file_text(path)
+  end
 
   util.notify(("loading project config: %s\n(answer the trust prompt below)"):format(path), vim.log.levels.INFO)
   local src = vim.secure.read(path)

@@ -182,6 +182,42 @@ return {
       assert.equals(1, secure_calls, "second/third discover should hit session cache, not re-prompt")
     end)
 
+    it("does NOT emit pre-prompt notify when vim.secure already trusts the file", function()
+      make_project([[return { x = { name = "X", cmd = "x" } }]])
+
+      -- Pre-trust the file by writing its hash into the trust DB ourselves.
+      -- Use the same path normalization the plugin uses (post-cwd realpath).
+      local proj = vim.fs.normalize(vim.fn.getcwd() .. "/run.nvim.lua")
+      local content = (function()
+        local fd = io.open(proj, "rb")
+        local s = fd:read("*a")
+        fd:close()
+        return s
+      end)()
+      local hash = vim.fn.sha256(content)
+      local trust_dir = vim.fn.stdpath("state")
+      vim.fn.mkdir(trust_dir, "p")
+      local tfd = io.open(trust_dir .. "/trust", "w")
+      tfd:write(hash .. " " .. proj .. "\n")
+      tfd:close()
+
+      local original = vim.secure.read
+      vim.secure.read = function() error("should not be called when already trusted") end
+      local ok, result = pcall(
+        helpers.capture_notify,
+        function() require("run").setup({ project = { trust = "prompt" } }) end
+      )
+      vim.secure.read = original
+      vim.fn.delete(trust_dir .. "/trust")
+
+      assert.is_true(ok, "vim.secure.read was incorrectly called: " .. tostring(result))
+      assert.is_true(require("run.project").has_project())
+      assert.is_nil(
+        helpers.find_notify(result, "loading project config"),
+        "no pre-prompt notify should fire when vim.secure already trusts the file"
+      )
+    end)
+
     it("invalidates cache by content change is bypassed within session (intentional)", function()
       local dir = make_project([[return { v1 = { name = "V1", cmd = "x" } }]])
 
