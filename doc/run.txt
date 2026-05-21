@@ -1,7 +1,7 @@
 *run.txt*    A small, opinionated command runner for Neovim
 *run* *run.nvim*
 
-Author:   SpyicyDev
+Author:   mackhaymond
 License:  MIT
 
 ==============================================================================
@@ -49,7 +49,7 @@ terminal in a horizontal split.
 With lazy.nvim ~
 >lua
     {
-      "SpyicyDev/run.nvim",
+      "mackhaymond/run.nvim",
       cmd = { "Run", "RunProj", "RunSetDefault", "RunReloadProj" },
       keys = {
         { "<leader>rr", "<cmd>Run<cr>",     desc = "Run" },

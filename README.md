@@ -1,6 +1,6 @@
 # run.nvim
 
-[![CI](https://github.com/SpyicyDev/run.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/SpyicyDev/run.nvim/actions/workflows/ci.yml)
+[![CI](https://github.com/mackhaymond/run.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/mackhaymond/run.nvim/actions/workflows/ci.yml)
 
 A small, opinionated command runner for Neovim. Run filetype-default commands or per-project commands declared in a single `run.nvim.lua` file at your project root. Shell, Vim, and Lua-function commands are all first-class.
 
@@ -21,7 +21,7 @@ A small, opinionated command runner for Neovim. Run filetype-default commands or
 
 ```lua
 {
-  "SpyicyDev/run.nvim",
+  "mackhaymond/run.nvim",
   cmd = { "Run", "RunProj", "RunSetDefault", "RunReloadProj" },
   keys = {
     { "<leader>rr", "<cmd>Run<cr>",     desc = "Run" },
@@ -37,7 +37,7 @@ If you want a specific terminal backend, add it as a dep and configure:
 
 ```lua
 {
-  "SpyicyDev/run.nvim",
+  "mackhaymond/run.nvim",
   dependencies = { "akinsho/toggleterm.nvim" },
   opts = {
     terminal = { backend = "toggleterm", position = "float" },
